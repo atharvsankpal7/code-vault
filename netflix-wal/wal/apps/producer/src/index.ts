@@ -1,6 +1,6 @@
 import express from "express";
-import { db } from "../drizzle/src";
-import { wal } from "../drizzle/src/db/schema";
+import { db } from "@wal/database";
+import { wal } from "@wal/database/schema";
 
 const app = express();
 

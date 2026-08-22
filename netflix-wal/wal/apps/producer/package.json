@@ -1,0 +1,25 @@
+{
+  "name": "wal-producer",
+  "version": "1.0.0",
+  "description": "WAL producer API",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "@wal/database": "workspace:*",
+    "express": "^5.2.1",
+    "kafkajs": "^2.2.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}

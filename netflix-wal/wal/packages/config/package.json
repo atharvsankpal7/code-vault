@@ -1,0 +1,11 @@
+{
+  "name": "@wal/config",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}
