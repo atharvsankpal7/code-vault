@@ -8,6 +8,8 @@
     "dev:consumer": "pnpm --filter wal-consumer dev",
     "start:producer": "pnpm --filter wal-producer start",
     "start:consumer": "pnpm --filter wal-consumer start",
+    "wal-db:generate": "pnpm exec drizzle-kit generate --config packages/wal-db/drizzle.config.ts",
+    "wal-db:migrate": "pnpm exec drizzle-kit migrate --config packages/wal-db/drizzle.config.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },
@@ -15,7 +17,7 @@
     "@wal/config": "workspace:*"
   },
   "devDependencies": {
-    "drizzle-kit": "1.0.0-rc.4",
+    "drizzle-kit": "^0.31.8",
     "tsx": "^4.23.12",
     "typescript": "^7.0.0"
   }

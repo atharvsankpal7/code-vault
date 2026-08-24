@@ -157,3 +157,143 @@ Consumer:      perform the work
 Deployment:    keep enough worker instances running
 Target:        apply the business-side mutation
 ```
+
+## Implementation plan
+
+### Storage responsibilities
+
+The platform uses a control-plane PostgreSQL database, a separate durable WAL
+store, and Kafka. The durable WAL store is initially implemented with PostgreSQL
+behind the shared `@wal/wal-db` package and can later be replaced by a distributed
+key-value store.
+
+```text
+Control-plane PostgreSQL
+  - WAL namespaces
+  - desired Kafka topic configuration
+  - delivery targets and retry policies
+  - configuration versions
+  - reconciliation status and errors
+
+Durable WAL store
+  - advanced multi-table or multi-partition operations
+  - ordered mutation content and operation state
+  - completion-marker outbox
+
+Kafka
+  - original WAL events
+  - lightweight completion markers for advanced operations
+  - durable retry records
+  - dead-letter records
+  - consumer offsets
+```
+
+Ordinary namespaces publish their complete event to Kafka. Advanced namespaces
+first persist their content, state, and ordering sequence to the durable WAL store
+in one transaction. That transaction also creates an outbox entry. An outbox
+publisher forwards a lightweight completion marker to Kafka, and the consumer uses
+the marker's operation ID to reconstruct the ordered mutations from durable
+storage. This workflow remains at-least-once and therefore uses idempotent marker
+publication and target operations.
+
+### Control plane
+
+The control plane owns the configuration API and runs an idempotent reconciliation
+loop. An API change first updates the desired state in PostgreSQL and increments
+the configuration generation. The reconciler then compares that state with Kafka
+and safely moves Kafka toward the requested configuration.
+
+The first version will support:
+
+- Creating missing topics.
+- Increasing partition counts, but never reducing them.
+- Applying mutable topic settings such as retention.
+- Rejecting or separately handling destructive and unsupported changes.
+- Recording the observed generation, reconciliation status, last attempt, and
+  last error.
+- Periodic reconciliation plus a manually triggered reconciliation endpoint.
+- Database locking so multiple control-plane replicas do not process the same
+  configuration concurrently.
+
+### Runtime configuration
+
+The producer and consumer keep validated configuration snapshots in memory. They
+poll role-specific control-plane endpoints using HTTP conditional requests:
+
+```text
+GET /v1/runtime-config/producer
+GET /v1/runtime-config/consumer
+```
+
+Each response includes a monotonically increasing version and an `ETag`. A worker
+sends `If-None-Match` on its next poll and receives `304 Not Modified` when its
+configuration is current. PostgreSQL stores only the latest configuration, so
+workers do not request historical snapshots.
+
+If a refresh fails, a worker continues using its last valid snapshot. Target URL
+and retry-policy changes can be swapped in memory. Changes to a topic, consumer
+group, subscription, or Kafka credentials require a graceful restart of the
+affected consumer.
+
+### Producer
+
+The producer will:
+
+1. Resolve the namespace through its cached runtime configuration.
+2. Validate and normalize the request.
+3. Create an envelope containing an event ID, namespace, timestamp, schema
+   version, and payload.
+4. Publish the complete event to the configured Kafka topic.
+5. Return success only after Kafka acknowledges the configured durability level.
+
+### Consumer and targets
+
+Kafka does not deliver records directly to arbitrary targets. WAL consumer workers
+read the topic and perform delivery. Each target has an independent consumer group
+so every configured target receives every event.
+
+```text
+wal.orders
+  +-- group wal.orders.inventory --> inventory target
+  +-- group wal.orders.billing   --> billing target
+  +-- group wal.orders.analytics --> analytics target
+```
+
+Target definitions and retry policies live in PostgreSQL. The control-plane
+database is not queried for every message; workers use their in-memory
+configuration snapshot.
+
+### Durable retries and dead letters
+
+Per-message retry state is stored durably in Kafka rather than PostgreSQL:
+
+```text
+wal.orders
+  +-- delivery succeeds --> commit offset
+  +-- delivery fails    --> wal.orders.retry.<delay>
+  +-- attempts exhausted --> wal.orders.dlq
+```
+
+A retry record contains the original event, target ID, attempt number, next
+eligible time, and last error. The maximum attempts and backoff rules come from the
+cached control-plane configuration. Retry records store the attempt number rather
+than attempts remaining so policy changes do not rewrite existing records.
+
+Publishing a retry or DLQ record and committing the consumed offset must happen in
+one Kafka transaction. This prevents an acknowledged source record from losing its
+retry state. Delay-tier topics will be used initially to avoid blocking a partition
+while waiting for an individual record's retry time.
+
+### Delivery milestones
+
+1. Define PostgreSQL tables for namespaces, topics, targets, versions, and
+   reconciliation status.
+2. Implement control-plane CRUD APIs and Kafka topic reconciliation.
+3. Implement versioned producer and consumer runtime-configuration endpoints.
+4. Implement validated producer envelopes and durable Kafka publishing.
+5. Implement per-target consumer groups and HTTP target delivery.
+6. Add transactional retry topics, backoff tiers, and DLQ handling.
+7. Add integration tests for provisioning, delivery, retry, restart recovery, and
+   replay.
+8. Add health checks, reconciliation metrics, delivery metrics, consumer lag, and
+   configuration-staleness monitoring.

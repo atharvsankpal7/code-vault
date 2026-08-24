@@ -1,22 +1,15 @@
-import GlobalConfig from "@wal/config";
+import "dotenv/config";
 
-let Config = {
+import GlobalConfig, { validateConfig } from "@wal/config";
+
+const localConfig = validateConfig({
   PORT: process.env.PORT,
-};
-
-Object.entries(Config).forEach(([key, value]) => {
-  if (!value) {
-    console.error(
-      `Environment configuration error: "${key}" is not set correctly`,
-    );
-    process.exit(1);
-  }
+  walDatabaseUrl: process.env.WAL_DATABASE_URL,
 });
 
-let localConfig: {} = Config as Record<keyof typeof Config, string>;
-Config = {
-  ...Config,
+const Config = {
   ...GlobalConfig,
   ...localConfig,
-};
+} as const;
+
 export default Config;

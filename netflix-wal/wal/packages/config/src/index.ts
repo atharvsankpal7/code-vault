@@ -25,6 +25,8 @@ export function validateConfig<T extends EnvironmentConfig>(
   return config as ValidatedConfig<T>;
 }
 
-const GlobalConfig = validateConfig({});
+const GlobalConfig = validateConfig({
+  walDatabaseURI: process.env.DATABASE_URL,
+});
 
 export default GlobalConfig;
