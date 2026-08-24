@@ -1,8 +1,13 @@
-import GlobalConfig from "@wal/config";
-import "dotenv/config";
+import GlobalConfig, { validateConfig } from "@wal/config";
+
+const localConfig = validateConfig({
+  PORT: process.env.PORT,
+  databaseUrl: process.env.DATABASE_URL,
+});
+
 const Config = {
   ...GlobalConfig,
-  PORT: process.env.PORT,
+  ...localConfig,
 } as const;
 
 export default Config;

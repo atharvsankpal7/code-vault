@@ -13,8 +13,8 @@
   "packageManager": "pnpm@10.33.0",
   "dependencies": {
     "@wal/config": "workspace:*",
-    "@wal/database": "workspace:*",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "kafkajs": "^2.2.4"
   },

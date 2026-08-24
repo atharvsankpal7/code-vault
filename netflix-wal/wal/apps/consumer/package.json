@@ -7,7 +7,6 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@wal/database": "workspace:*",
     "@wal/config": "workspace:*",
     "express": "^5.2.1",
     "kafkajs": "^2.2.4"
