@@ -1,9 +1,12 @@
-import "dotenv/config";
+import path from "node:path";
+import dotenv from "dotenv";
 
-const Config = {
-  databaseUrl:
-    process.env.DATABASE_URL ??
-    "postgresql://postgres:postgres@localhost:5432/wal",
-} as const;
+dotenv.config({
+  path: path.resolve(__dirname, "../../../.env"),
+});
 
-export default Config;
+const GlobalConfig = {
+  databaseUrl: process.env.DATABASE_URL,
+};
+
+export default GlobalConfig;
