@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
-import Config from "./config";
+import Config from "./config.ts";
 
 export default defineConfig({
   schema: "./control-plane-db/schema",
