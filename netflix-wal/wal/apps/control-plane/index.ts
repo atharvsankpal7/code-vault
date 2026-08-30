@@ -8,7 +8,7 @@ const reconsiler = async () => {};
 
 app.get("/health", async (_req, res) => {
   const start = performance.now();
-  await db.select({}).from(wal).limit(1);
+  await db.select(1);
   const end = performance.now();
   res.send(`control-plane is healthy, Db-ping=[${end - start}ms]`);
 });
