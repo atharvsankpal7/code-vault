@@ -1,5 +1,5 @@
-import { Kafka } from "kafkajs";
-import { inArray } from "drizzle-orm";
+import { ConfigResourceTypes, Kafka } from "kafkajs";
+import { and, inArray, isNull, lt, or } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { kafkaTopic } from "./control-plane-db/schema";
@@ -21,6 +21,8 @@ export const reconsiler = async () => {
       numPartitions: kafkaTopic.partition_count,
       replicationFactor: kafkaTopic.replication_factor,
       minInsyncReplicas: kafkaTopic.min_insync_replicas,
+      updatedAt: kafkaTopic.updated_at,
+      lastReconciledAt: kafkaTopic.last_reconciled_at,
     })
     .from(kafkaTopic);
 
@@ -64,7 +66,7 @@ export const reconsiler = async () => {
 
     await db
       .update(kafkaTopic)
-      .set({ reconciliation_status: "done" })
+      .set({ reconciliation_status: "done", last_reconciled_at: new Date() })
       .where(
         inArray(
           kafkaTopic.kafka_topic_name,
@@ -72,7 +74,50 @@ export const reconsiler = async () => {
         ),
       );
   }
-  // get the topics who were not newly created
-  // update the config settings where the last_reconsiled_at is less than updated_at and update that toic in kafka update both to have same time
+  // Reconcile existing topics whose desired configuration has changed since the
+  // last successful reconciliation.
+  const existingTopics = dbTopicList.filter(({ topicName }) =>
+    kafkaTopics.has(topicName),
+  );
+  const topicsNeedingConfigUpdate = existingTopics.filter(
+    ({ lastReconciledAt, updatedAt }) =>
+      lastReconciledAt === null || lastReconciledAt < updatedAt,
+  );
 
+  if (topicsNeedingConfigUpdate.length !== 0) {
+    await admin.alterConfigs({
+      validateOnly: false,
+      resources: topicsNeedingConfigUpdate.map(
+        ({ topicName, minInsyncReplicas }) => ({
+          type: ConfigResourceTypes.TOPIC,
+          name: topicName,
+          configEntries: [
+            {
+              name: "min.insync.replicas",
+              value: String(minInsyncReplicas),
+            },
+          ],
+        }),
+      ),
+    });
+
+    const reconciledAt = new Date();
+    await db
+      .update(kafkaTopic)
+      .set({ last_reconciled_at: reconciledAt, reconciliation_status: "done" })
+      .where(
+        and(
+          inArray(
+            kafkaTopic.kafka_topic_name,
+            topicsNeedingConfigUpdate.map(({ topicName }) => topicName),
+          ),
+          or(
+            isNull(kafkaTopic.last_reconciled_at),
+            lt(kafkaTopic.last_reconciled_at, kafkaTopic.updated_at),
+          ),
+        ),
+      );
+  }
+
+  return missingTopics.length !== 0 || topicsNeedingConfigUpdate.length !== 0;
 };
