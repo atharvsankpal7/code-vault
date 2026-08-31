@@ -6,7 +6,8 @@ dotenv.config({
 });
 const localConfig = validateConfig({
   PORT: process.env.PORT,
-  databaseUrl: process.env.DATABASE_URL,
+  controlPlaneDatabaseUrl: process.env.DATABASE_URL,
+  kafkaClientId: process.env.KAFKA_CLIENT_ID,
 });
 
 const Config = {

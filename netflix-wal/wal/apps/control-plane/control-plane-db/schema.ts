@@ -26,12 +26,12 @@ const ReconciliationStatus = pgEnum("kafka_topic_reconciliation_status", [
 ]);
 export const kafkaTopic = pgTable("kafka_topic", {
   id: serial("id").primaryKey(),
-  kafka_topic_name: text("kafka_topic_name").notNull(),
+  kafka_topic_name: text("kafka_topic_name").notNull().unique(),
   partition_count: integer("partition_count").notNull(),
   replication_factor: integer("replication_factor").default(3).notNull(),
-  min_insync_replicas: integer("min_insync_replicas").default(0).notNull(), // 0 in database = all in kafka
-  last_reconciled_at: timestamp("last_reconciled_at"),
+  min_insync_replicas: integer("min_insync_replicas").default(-1).notNull(), // -1 in database = all in kafka
   reconciliation_status: ReconciliationStatus().default("pending").notNull(),
+  last_reconciled_at: timestamp("last_reconciled_at"),
   version: integer("version").notNull(),
   ...getCreatedAtUpdatedAtForTableGeneration(),
 });

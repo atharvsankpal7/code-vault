@@ -10,7 +10,7 @@ export default defineConfig({
   dialect: "postgresql",
 
   dbCredentials: {
-    url: Config.databaseUrl,
+    url: Config.controlPlaneDatabaseUrl,
   },
 
   strict: true,

@@ -27,6 +27,7 @@ export function validateConfig<T extends EnvironmentConfig>(
 
 const GlobalConfig = validateConfig({
   walDatabaseURI: process.env.DATABASE_URL,
+  kafkaBrokers: process.env.KAFKA_BROKERS,
 });
 
 export default GlobalConfig;
