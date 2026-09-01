@@ -1,4 +1,9 @@
-import { ConfigResourceTypes, Kafka } from "kafkajs";
+import {
+  ConfigResourceTypes,
+  ITopicConfig,
+  ITopicPartitionConfig,
+  Kafka,
+} from "kafkajs";
 import { and, inArray, isNull, lt, or } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
@@ -28,9 +33,9 @@ export const reconsiler = async () => {
       .from(kafkaTopic),
   ]);
 
-  const kafkaTopics = new Set(kafkaTopicList);
+  const existingKafkaTopics = new Set(kafkaTopicList);
   const missingTopics = dbTopicList.filter(
-    ({ topicName }) => !kafkaTopics.has(topicName),
+    ({ topicName }) => !existingKafkaTopics.has(topicName),
   );
 
   if (missingTopics.length !== 0) {
@@ -82,33 +87,35 @@ export const reconsiler = async () => {
   }
   // Reconcile existing topics whose desired configuration has changed since the
   // last successful reconciliation.
-  const topicsNeedingConfigUpdate = dbTopicList.filter(
+  const topicsOutOfVersion = dbTopicList.filter(
     ({ topicName, version, reconciled_version }) =>
-      kafkaTopics.has(topicName) && reconciled_version < version,
+      existingKafkaTopics.has(topicName) && reconciled_version < version,
   );
-  const topicMetaData = await admin.fetchTopicMetadata({
-    topics: topicsNeedingConfigUpdate.map((topic) => topic.topicName),
+
+  const kafkaTopicReplicas = await admin.describeConfigs({
+    includeSynonyms: false,
+    resources: topicsOutOfVersion.map((t) => ({
+      type: ConfigResourceTypes.TOPIC,
+      name: t.topicName,
+      configNames: ["min.insync.replicas"], // Explicit filter lowers payload size
+    })),
   });
 
-  dbTopicList.forEach(async (topic) => {
-    const currentTopicMetaData = topicMetaData.filter((topic)=> topic)
-    if (topic.replicationFactor > ) {
-      await admin.createPartitions({
-        topicPartitions: [
-          {
-            topic: topic.topicName,
-            count: topic.replicationFactor,
-          },
-        ],
-        validateOnly: false,
-      });
-    }
+  const outOfReplicationOrderTopics = topicsOutOfVersion.filter((t) => {
+    const topic = kafkaTopicReplicas.resources.find(
+      (topic) => topic.resourceName === t.topicName,
+    );
+    return (
+      topic?.configEntries &&
+      Number(topic?.configEntries[0].configValue) < t.minInsyncReplicas &&
+      t.replicationFactor >= t.minInsyncReplicas
+    );
   });
 
-  if (topicsNeedingConfigUpdate.length !== 0) {
+  if (topicsOutOfVersion.length !== 0) {
     await admin.alterConfigs({
       validateOnly: false,
-      resources: topicsNeedingConfigUpdate.map(
+      resources: outOfReplicationOrderTopics.map(
         ({ topicName, minInsyncReplicas }) => ({
           type: ConfigResourceTypes.TOPIC,
           name: topicName,
@@ -122,6 +129,26 @@ export const reconsiler = async () => {
       ),
     });
 
+    const topicMetaDataList = await admin.fetchTopicMetadata({
+      topics: topicsOutOfVersion.map((topic) => topic.topicName),
+    });
+    const outOfPartitionOrderTopics = topicsOutOfVersion.filter((t) => {
+      const topic = topicMetaDataList.topics.find(
+        (topic) => topic.name === t.topicName,
+      );
+      return topic?.partitions && topic?.partitions.length < t.numPartitions;
+    });
+
+    if (outOfPartitionOrderTopics.length > 0) {
+      await admin.createPartitions({
+        topicPartitions: outOfPartitionOrderTopics.map((t) => ({
+          topic: t.topicName,
+          count: t.numPartitions,
+        })),
+        validateOnly: false,
+      });
+    }
+
     const reconciledAt = new Date();
     await db
       .update(kafkaTopic)
@@ -130,7 +157,7 @@ export const reconsiler = async () => {
         and(
           inArray(
             kafkaTopic.kafka_topic_name,
-            topicsNeedingConfigUpdate.map(({ topicName }) => topicName),
+            topicsOutOfVersion.map(({ topicName }) => topicName),
           ),
           or(
             isNull(kafkaTopic.last_reconciled_at),
@@ -140,10 +167,5 @@ export const reconsiler = async () => {
       );
   }
 
-  return missingTopics.length !== 0 || topicsNeedingConfigUpdate.length !== 0;
+  return missingTopics.length !== 0 || topicsOutOfVersion.length !== 0;
 };
-
-
-
-
-          ,
