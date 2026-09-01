@@ -13,18 +13,20 @@ const admin = kafka.admin();
 
 export const reconsiler = async () => {
   await admin.connect();
-
-  const kafkaTopicList = await admin.listTopics();
-  const dbTopicList = await db
-    .select({
-      topicName: kafkaTopic.kafka_topic_name,
-      numPartitions: kafkaTopic.partition_count,
-      replicationFactor: kafkaTopic.replication_factor,
-      minInsyncReplicas: kafkaTopic.min_insync_replicas,
-      updatedAt: kafkaTopic.updated_at,
-      lastReconciledAt: kafkaTopic.last_reconciled_at,
-    })
-    .from(kafkaTopic);
+  const [kafkaTopicList, dbTopicList] = await Promise.all([
+    await admin.listTopics(),
+    await db
+      .select({
+        topicName: kafkaTopic.kafka_topic_name,
+        numPartitions: kafkaTopic.partition_count,
+        replicationFactor: kafkaTopic.replication_factor,
+        minInsyncReplicas: kafkaTopic.min_insync_replicas,
+        updatedAt: kafkaTopic.updated_at,
+        version: kafkaTopic.version,
+        reconciled_version: kafkaTopic.reconciled_version,
+      })
+      .from(kafkaTopic),
+  ]);
 
   const kafkaTopics = new Set(kafkaTopicList);
   const missingTopics = dbTopicList.filter(
@@ -63,10 +65,14 @@ export const reconsiler = async () => {
         }),
       ),
     });
-
+    const currentTime = new Date();
     await db
       .update(kafkaTopic)
-      .set({ reconciliation_status: "done", last_reconciled_at: new Date() })
+      .set({
+        reconciliation_status: "done",
+        last_reconciled_at: currentTime,
+        reconciled_version: kafkaTopic.version,
+      })
       .where(
         inArray(
           kafkaTopic.kafka_topic_name,
@@ -76,13 +82,28 @@ export const reconsiler = async () => {
   }
   // Reconcile existing topics whose desired configuration has changed since the
   // last successful reconciliation.
-  const existingTopics = dbTopicList.filter(({ topicName }) =>
-    kafkaTopics.has(topicName),
+  const topicsNeedingConfigUpdate = dbTopicList.filter(
+    ({ topicName, version, reconciled_version }) =>
+      kafkaTopics.has(topicName) && reconciled_version < version,
   );
-  const topicsNeedingConfigUpdate = existingTopics.filter(
-    ({ lastReconciledAt, updatedAt }) =>
-      lastReconciledAt === null || lastReconciledAt < updatedAt,
-  );
+  const topicMetaData = await admin.fetchTopicMetadata({
+    topics: topicsNeedingConfigUpdate.map((topic) => topic.topicName),
+  });
+
+  dbTopicList.forEach(async (topic) => {
+    const currentTopicMetaData = topicMetaData.filter((topic)=> topic)
+    if (topic.replicationFactor > ) {
+      await admin.createPartitions({
+        topicPartitions: [
+          {
+            topic: topic.topicName,
+            count: topic.replicationFactor,
+          },
+        ],
+        validateOnly: false,
+      });
+    }
+  });
 
   if (topicsNeedingConfigUpdate.length !== 0) {
     await admin.alterConfigs({
@@ -121,3 +142,8 @@ export const reconsiler = async () => {
 
   return missingTopics.length !== 0 || topicsNeedingConfigUpdate.length !== 0;
 };
+
+
+
+
+          ,

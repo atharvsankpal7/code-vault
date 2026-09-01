@@ -33,6 +33,7 @@ export const kafkaTopic = pgTable("kafka_topic", {
   reconciliation_status: ReconciliationStatus().default("pending").notNull(),
   last_reconciled_at: timestamp("last_reconciled_at"),
   version: integer("version").notNull(),
+  reconciled_version: integer("reconciled_version").notNull().default(0),
   ...getCreatedAtUpdatedAtForTableGeneration(),
 });
 
