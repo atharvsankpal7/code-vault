@@ -52,6 +52,9 @@ importers:
       '@wal/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@wal/wal-db':
+        specifier: workspace:*
+        version: link:../../packages/wal-db
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -95,9 +98,6 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -133,6 +133,10 @@ importers:
       pg:
         specifier: ^8.23.0
         version: 8.23.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.21.0
+        version: 8.21.0
 
 packages:
 
