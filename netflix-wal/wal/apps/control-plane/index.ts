@@ -1,7 +1,6 @@
 import express, { NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import Config from "./config";
-import Kafka from "kafkajs";
 import db from "./control-plane-db";
 import { reconsiler } from "./reconsiler";
 
