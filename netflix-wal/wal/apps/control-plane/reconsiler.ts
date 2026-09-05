@@ -136,7 +136,7 @@ export const reconsiler = async () => {
     });
 
     if (outOfPartitionOrderTopics.length > 0) {
-      admin.createPartitions({
+      await admin.createPartitions({
         topics: outOfPartitionOrderTopics.map((t) => ({
           name: t.topicName,
           count: t.numPartitions,
