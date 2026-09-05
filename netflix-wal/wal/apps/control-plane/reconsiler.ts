@@ -1,23 +1,15 @@
-import {
-  ConfigResourceTypes,
-  ITopicConfig,
-  ITopicPartitionConfig,
-  Kafka,
-} from "kafkajs";
+import { Admin, ConfigResourceTypes } from "@platformatic/kafka";
 import { and, inArray, isNull, lt, or } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { kafkaTopic } from "./control-plane-db/schema";
 
-const kafka = new Kafka({
+const admin = new Admin({
   clientId: Config.kafkaClientId,
-  brokers: Config.kafkaBrokers.split(","),
+  bootstrapBrokers: Config.kafkaBrokers.split(","),
 });
 
-const admin = kafka.admin();
-
 export const reconsiler = async () => {
-  await admin.connect();
   const [kafkaTopicList, dbTopicList] = await Promise.all([
     admin.listTopics(),
     db
@@ -50,27 +42,23 @@ export const reconsiler = async () => {
         ),
       );
 
-    await admin.createTopics({
-      waitForLeaders: true,
-      topics: missingTopics.map(
-        ({
-          topicName,
-          numPartitions,
-          replicationFactor,
-          minInsyncReplicas,
-        }) => ({
-          topic: topicName,
-          numPartitions,
-          replicationFactor,
-          configEntries: [
+    //note: batch if parallel topic creation becomes an issue
+    await Promise.all(
+      missingTopics.map((t) =>
+        admin.createTopics({
+          topics: [t.topicName],
+          partitions: t.numPartitions,
+          replicas: t.replicationFactor,
+          configs: [
             {
               name: "min.insync.replicas",
-              value: String(minInsyncReplicas),
+              value: String(t.minInsyncReplicas),
             },
           ],
         }),
       ),
-    });
+    );
+
     const currentTime = new Date();
     await db
       .update(kafkaTopic)
@@ -91,49 +79,48 @@ export const reconsiler = async () => {
   const topicsOutOfVersion = dbTopicList.filter(
     ({ topicName, version, reconciled_version }) =>
       existingKafkaTopics.has(topicName) &&
-      (reconciled_version || reconciled_version < version),
+      (reconciled_version === null || reconciled_version < version),
   );
   if (topicsOutOfVersion.length === 0) {
     console.log("no topics out of version");
     return missingTopics.length !== 0;
   }
   const [topicMetadataLista, kafkaTopicReplicas] = await Promise.all([
-    admin.fetchTopicMetadata({
+    admin.metadata({
       topics: topicsOutOfVersion.map((t) => t.topicName),
     }),
     admin.describeConfigs({
       includeSynonyms: false,
       resources: topicsOutOfVersion.map((t) => ({
-        type: ConfigResourceTypes.TOPIC,
-        name: t.topicName,
-        configNames: ["min.insync.replicas"], // strict names to avoid overhead
+        resourceType: ConfigResourceTypes.TOPIC,
+        resourceName: t.topicName,
+        configurationKeys: ["min.insync.replicas"], // strict names to avoid overhead
       })),
     }),
   ]);
 
   const outOf_MinISR_Topics = topicsOutOfVersion.filter((t) => {
-    const topic = kafkaTopicReplicas.resources.find(
+    const topic = kafkaTopicReplicas.find(
       (topic) => topic.resourceName === t.topicName,
     );
-    const minIsrConfig = topic?.configEntries?.find( 
-      (entry) => entry.configName === "min.insync.replicas",
+    const minIsrConfig = topic?.configs?.find(
+      (entry) => entry.name === "min.insync.replicas",
     );
 
-    if (!minIsrConfig?.configValue) {
+    if (!minIsrConfig?.value) {
       return false;
     }
 
-    return Number(minIsrConfig.configValue) !== t.minInsyncReplicas;
+    return Number(minIsrConfig.value) !== t.minInsyncReplicas;
   });
 
   if (topicsOutOfVersion.length !== 0) {
     await admin.alterConfigs({
-      validateOnly: false,
       resources: outOf_MinISR_Topics.map(
         ({ topicName, minInsyncReplicas }) => ({
-          type: ConfigResourceTypes.TOPIC,
-          name: topicName,
-          configEntries: [
+          resourceType: ConfigResourceTypes.TOPIC,
+          resourceName: topicName,
+          configs: [
             {
               name: "min.insync.replicas",
               value: String(minInsyncReplicas),
@@ -144,16 +131,14 @@ export const reconsiler = async () => {
     });
 
     const outOfPartitionOrderTopics = topicsOutOfVersion.filter((t) => {
-      const topic = topicMetadataLista.topics.find(
-        (topic) => topic.name === t.topicName,
-      );
-      return topic?.partitions && topic?.partitions.length < t.numPartitions;
+      const topic = topicMetadataLista.topics.get(t.topicName);
+      return topic?.partitionsCount && topic?.partitionsCount < t.numPartitions;
     });
 
     if (outOfPartitionOrderTopics.length > 0) {
-      await admin.createPartitions({
-        topicPartitions: outOfPartitionOrderTopics.map((t) => ({
-          topic: t.topicName,
+      admin.createPartitions({
+        topics: outOfPartitionOrderTopics.map((t) => ({
+          name: t.topicName,
           count: t.numPartitions,
         })),
         validateOnly: false,
@@ -166,8 +151,7 @@ export const reconsiler = async () => {
       .set({
         last_reconciled_at: reconciledAt,
         reconciliation_status: "done",
-        reconciled_version: dbTopicList.find((t) => t.id === kafkaTopic.id)!
-          .version!,
+        reconciled_version: kafkaTopic.version,
       })
       .where(
         and(
