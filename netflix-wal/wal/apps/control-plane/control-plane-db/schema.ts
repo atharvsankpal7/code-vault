@@ -7,15 +7,7 @@ import {
   timestamp,
   pgEnum,
 } from "drizzle-orm/pg-core";
-const getCreatedAtUpdatedAtForTableGeneration = () => {
-  return {
-    created_at: timestamp("created_at").defaultNow().notNull(),
-    updated_at: timestamp("updated_at")
-      .notNull()
-      .defaultNow()
-      .$onUpdateFn(() => new Date()),
-  };
-};
+import { getCreatedAtUpdatedAtForTableGeneration } from "@wal/wal-db/schema";
 
 const ReconciliationStatus = pgEnum("kafka_topic_reconciliation_status", [
   "pending",

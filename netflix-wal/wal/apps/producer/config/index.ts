@@ -4,7 +4,7 @@ import GlobalConfig, { validateConfig } from "@wal/config";
 
 const localConfig = validateConfig({
   PORT: process.env.PORT,
-  walDatabaseUrl: process.env.WAL_DATABASE_URL,
+  clientId: process.env.CLIENT_ID,
 });
 
 const Config = {
