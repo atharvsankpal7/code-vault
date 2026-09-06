@@ -3,7 +3,6 @@ import express, { NextFunction, Request, Response } from "express";
 import Config from "./config";
 import db from "@wal/wal-db";
 import { wal_outbox } from "@wal/wal-db/schema";
-import { KafkaConsumerGroupStates } from "@platformatic/kafka";
 import { generateWal } from "./wal.service";
 import { TKafkaTopicMapResponse } from "@wal/config";
 
