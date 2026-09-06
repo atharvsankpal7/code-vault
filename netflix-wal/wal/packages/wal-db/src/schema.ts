@@ -16,12 +16,6 @@ export const getCreatedAtUpdatedAtForTableGeneration = () => {
       .$onUpdateFn(() => new Date()),
   };
 };
-export const wal = pgTable("wal", {
-  id: uuid().primaryKey().defaultRandom(),
-  topic_name: text("topic_name").notNull().unique(),
-  message: text("message").notNull(), // in real life we would have types per topic in order to keep our system more robust
-  ...getCreatedAtUpdatedAtForTableGeneration(),
-});
 
 const outboxStatus = pgEnum("outbox_status", [
   "pending",
@@ -30,10 +24,12 @@ const outboxStatus = pgEnum("outbox_status", [
   "failed",
 ]);
 
-export const outbox = pgTable("outbox", {
-  id: uuid().primaryKey(),
-  status: outboxStatus().default("pending").notNull(),
+export const wal_outbox = pgTable("wal_outbox", {
+  id: uuid().primaryKey().defaultRandom(),
+  status: outboxStatus().notNull(),
+  topic_name: text("topic_name").notNull().unique(),
+  message: text("message").notNull(), // in real life we would have types per topic in order to keep our system more robust
   error: jsonb(),
-  payload: jsonb().notNull(),
+  workerId: text("worker_id"),
   ...getCreatedAtUpdatedAtForTableGeneration(),
 });

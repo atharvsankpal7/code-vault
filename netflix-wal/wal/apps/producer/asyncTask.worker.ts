@@ -17,5 +17,18 @@ export const sendMessageToKafka = async ({
     serializers: stringSerializers,
   });
 
+  const messageFromDb = await db.select().from(wal).where({
+    status: "pending",
+  });
+
   // perform the computation that we would want to perform and convert the raw message into something that our kafka should strore
+
+  const result = await producer.send({
+    messages: [
+      {
+        topic: topicName,
+        value: message,
+      },
+    ],
+  });
 };
