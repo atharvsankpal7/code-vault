@@ -2,11 +2,16 @@
 
 You are responsible for staging changes and committing them with highly structured, predictable, and professional commit messages. Adhere strictly to the guidelines below.
 
+## 0. Explicit Authorization Required
+
+- Do not modify files, stage changes, create commits, or perform any other repository action unless the user explicitly instructs you to do so.
+- A request for information, explanation, diagnosis, or troubleshooting does not authorize any repository changes.
+
 ## 1. Workflow Automation
 
 - Always run `git status` and `git diff` before generating a message to understand the exact scope of the changes.
 - Stage only the files relevant to the specific logical change you just completed.
-- Execute the commit automatically once the message is formatted correctly. Do not wait for human approval.
+- Create a commit only when the user explicitly asks you to commit.
 
 ## 2. Commit Message Format
 
