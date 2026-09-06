@@ -9,7 +9,7 @@ import { KAKFA_CONFIG } from ".";
 const getProcessingTimeout = (now: Date) => {
   const topicDeadlines = [...KAKFA_CONFIG].map(([topicName, details]) =>
     sql`when ${topicName} then ${new Date(
-      now.getTime() + details.leaseWaitTimeInMinutes * 60 * 1000,
+      now.getTime() + details.workerWaitTimeInMinutes * 60 * 1000,
     )}`,
   );
 
