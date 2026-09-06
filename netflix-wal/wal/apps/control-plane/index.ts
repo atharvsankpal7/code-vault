@@ -32,8 +32,8 @@ app.get("/reconsile", async (_req: Request, res: Response) => {
 });
 
 app.get("/get-topic-map", async (_req: Request, res: Response) => {
-  const topicMap = await getTopicMap();
-  res.status(200).send(topicMap);
+  const topicMap = await getTopicMap(admin);
+  res.status(200).send({ topicMap: topicMap });
 });
 
 // Must be registered after all routes so it handles errors from the application.
