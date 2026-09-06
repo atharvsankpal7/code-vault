@@ -31,4 +31,17 @@ const GlobalConfig = validateConfig({
   controlPlaneUrl: process.env.CONTROL_PLANE_URL,
 });
 
+export enum TopicOperationType {
+  database = "database",
+  kafka = "kafka",
+}
+
+export interface TopicDetails {
+  operationType: TopicOperationType;
+  workerWaitTimeInMinutes: number;
+  acknowledgement: number;
+}
+
+export type TKafkaTopicMapResponse = Map<string, TopicDetails>;
+
 export default GlobalConfig;

@@ -8,6 +8,7 @@ import {
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { getCreatedAtUpdatedAtForTableGeneration } from "@wal/wal-db/schema";
+import { TopicOperationType } from "@wal/config";
 
 const ReconciliationStatus = pgEnum("kafka_topic_reconciliation_status", [
   "pending",
@@ -16,16 +17,21 @@ const ReconciliationStatus = pgEnum("kafka_topic_reconciliation_status", [
   "disabled",
   "error",
 ]);
+const TopicOperationTypePg = pgEnum("topic_operation_type", TopicOperationType);
 export const kafkaTopic = pgTable("kafka_topic", {
   id: serial("id").primaryKey(),
   kafka_topic_name: text("kafka_topic_name").notNull().unique(),
   partition_count: integer("partition_count").notNull(),
   replication_factor: integer("replication_factor").default(3).notNull(),
-  min_insync_replicas: integer("min_insync_replicas").default(-1).notNull(), // -1 in database = all in kafka
+  min_insync_replicas: integer("min_insync_replicas").default(-1).notNull(), // -1 in database = all in kafka// add validation to prevent it not being more than replication_factor
   reconciliation_status: ReconciliationStatus().default("pending").notNull(),
   last_reconciled_at: timestamp("last_reconciled_at"),
   version: integer("version").notNull(),
   reconciled_version: integer("reconciled_version").notNull().default(0),
+  topic_production_type: TopicOperationTypePg().notNull(), //fix type issue and delete this comment
+  worker_wait_time_in_minutes: integer("worker_wait_time_in_minutes")
+    .notNull()
+    .default(10),
   ...getCreatedAtUpdatedAtForTableGeneration(),
 });
 

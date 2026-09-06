@@ -5,18 +5,9 @@ import db from "@wal/wal-db";
 import { wal_outbox } from "@wal/wal-db/schema";
 import { KafkaConsumerGroupStates } from "@platformatic/kafka";
 import { generateWal } from "./wal.service";
+import { TKafkaTopicMapResponse } from "@wal/config";
 
-enum TopicOperationType {
-  database = "database",
-  kafka = "kafka",
-}
-interface topicDetails {
-  operationType: TopicOperationType;
-  leaseWaitTimeInMinutes: number;
-  acknowledgement: number;
-}
-
-export let KAKFA_CONFIG: Map<string, topicDetails> = new Map();
+export let KAKFA_CONFIG: TKafkaTopicMapResponse = new Map();
 
 const app = express();
 

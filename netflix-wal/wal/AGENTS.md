@@ -40,3 +40,6 @@ Follow the **Conventional Commits** specification. Every commit message must use
 - `fix(git): resolve empty object pack file fetch error`
 - `chore(deps): update dotenv to latest version`
 - `style(ui): align layout elements for consistent UX`
+-
+
+also add bullet points as description describing what are the main things that happen in our commit, use less than 120 characters whole start each line with a dash

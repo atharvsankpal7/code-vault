@@ -4,12 +4,7 @@ import Config from "./config";
 import db from "./control-plane-db";
 import { kafkaTopic } from "./control-plane-db/schema";
 
-const admin = new Admin({
-  clientId: Config.kafkaClientId,
-  bootstrapBrokers: Config.kafkaBrokers.split(","),
-});
-
-export const reconsiler = async () => {
+export const reconsiler = async (admin: Admin) => {
   const [kafkaTopicList, dbTopicList] = await Promise.all([
     admin.listTopics(),
     db
