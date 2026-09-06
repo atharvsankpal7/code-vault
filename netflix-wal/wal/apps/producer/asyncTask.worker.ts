@@ -1,13 +1,23 @@
 import db from "@wal/wal-db";
-import { desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 import { Producer, stringSerializers } from "@platformatic/kafka";
 import Config from "./config";
 import { wal_outbox } from "@wal/wal-db/schema";
 import { KAKFA_CONFIG } from ".";
-import { response } from "express";
 
-const WORKER_LEASE_MS = 60 * 1000;
+const getProcessingTimeout = (now: Date) => {
+  const topicDeadlines = [...KAKFA_CONFIG].map(([topicName, details]) =>
+    sql`when ${topicName} then ${new Date(
+      now.getTime() + details.leaseWaitTimeInMinutes * 60 * 1000,
+    )}`,
+  );
+
+  return sql<Date>`case ${wal_outbox.topic_name}
+    ${sql.join(topicDeadlines, sql.raw(" "))}
+    else ${now}
+  end`;
+};
 const workerId = uuidv7();
 
 export const sendMessageToKafka = async () => {
@@ -23,13 +33,13 @@ export const sendMessageToKafka = async () => {
       workerId,
       status: "processing",
       processStartedAt: now,
-      processingTimeOut: new Date(now.getTime() + WORKER_LEASE_MS),
+      processingTimeOut: getProcessingTimeout(now),
     })
     .where(
-      eq(
+      inArray(
         wal_outbox.id,
         db
-          .select()
+          .select({ id: wal_outbox.id })
           .from(wal_outbox)
           .where(eq(wal_outbox.status, "pending"))
           .limit(10)

@@ -19,7 +19,7 @@ export const getCreatedAtUpdatedAtForTableGeneration = () => {
 
 const outboxStatus = pgEnum("outbox_status", [
   "pending",
-  "in-progress",
+  "processing",
   "done",
   "failed",
 ]);
@@ -27,9 +27,12 @@ const outboxStatus = pgEnum("outbox_status", [
 export const wal_outbox = pgTable("wal_outbox", {
   id: uuid().primaryKey().defaultRandom(),
   status: outboxStatus().notNull(),
-  topic_name: text("topic_name").notNull().unique(),
+  topic_name: text("topic_name").notNull(),
   message: text("message").notNull(), // in real life we would have types per topic in order to keep our system more robust
   error: jsonb(),
   workerId: text("worker_id"),
+  processStartedAt: timestamp("process_started_at"),
+  processingTimeOut: timestamp("processing_time_out"),
+  processCompletedAt: timestamp("process_completed_at"),
   ...getCreatedAtUpdatedAtForTableGeneration(),
 });

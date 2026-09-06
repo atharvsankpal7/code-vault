@@ -17,7 +17,9 @@
     "@wal/config": "workspace:*",
     "@wal/wal-db": "workspace:*",
     "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
+    "uuidv7": "^1.2.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {

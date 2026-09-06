@@ -13,6 +13,7 @@ enum TopicOperationType {
 interface topicDetails {
   operationType: TopicOperationType;
   leaseWaitTimeInMinutes: number;
+  acknowledgement: number;
 }
 
 export let KAKFA_CONFIG: Map<string, topicDetails> = new Map();
