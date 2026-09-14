@@ -20,7 +20,7 @@ const getProcessingTimeout = (now: Date) => {
 };
 const workerId = uuidv7();
 
-export const sendMessageToKafka = async () => {
+export const sendPendingMessageToKafka = async () => {
   const producer = new Producer({
     clientId: Config.clientId,
     bootstrapBrokers: Config.kafkaBrokers.split(","),

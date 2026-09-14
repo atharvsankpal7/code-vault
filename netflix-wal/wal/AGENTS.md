@@ -39,12 +39,4 @@ Follow the **Conventional Commits** specification. Every commit message must use
 - **Length Constraint:** Keep the first line under 50 characters.
 - **Clarity over AI Verbosity:** Be concise and precise. Avoid meta-commentary like "Refactoring the code because..." or "This commit fixes...". Just state what the change does.
 
-## 4. Example Messages
-
-- `feat(config): crash process if critical env variables are missing`
-- `fix(git): resolve empty object pack file fetch error`
-- `chore(deps): update dotenv to latest version`
-- `style(ui): align layout elements for consistent UX`
--
-
 also add bullet points as description describing what are the main things that happen in our commit, use less than 120 characters whole start each line with a dash

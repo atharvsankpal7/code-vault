@@ -1,8 +1,7 @@
 import GlobalConfig from "@wal/config";
-import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 
-const databaseUrl = GlobalConfig.;
+const databaseUrl = GlobalConfig.walDatabaseURI;
 
 if (!databaseUrl) {
   throw new Error(
@@ -11,8 +10,8 @@ if (!databaseUrl) {
 }
 
 export default defineConfig({
-  schema: "./packages/wal-db/src/schema.ts",
-  out: "./packages/wal-db/migrations",
+  schema: "./src/schema.ts",
+  out: "./migrations",
   dialect: "postgresql",
   dbCredentials: {
     url: databaseUrl,
