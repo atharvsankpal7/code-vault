@@ -1,8 +1,6 @@
 import express, { NextFunction, Request, Response } from "express";
 
 import Config from "./config";
-import db from "@wal/wal-db";
-import { wal_outbox } from "@wal/wal-db/schema";
 import { generateWal } from "./wal.service";
 import { TKafkaTopicMapResponse } from "@wal/config";
 
@@ -18,13 +16,14 @@ const getTopicMap = async (): Promise<TKafkaTopicMapResponse> => {
 app.get("/hi", (_req, res) => {
   res.send("Hello, World!");
 });
-
-app.get("/refresh-kafka-map", async (req, res) => {
+app.get("/refresh-kafka-map", async (_req, res) => {
   KAKFA_CONFIG = await getTopicMap();
+  res.send("Kafka map refreshed");
 });
 
-app.get("/generate-wal", async (req, res) => {
+app.post("/generate-wal", async (req, res) => {
   await generateWal(req.body);
+  res.send("WAL generated");
 });
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
@@ -38,7 +37,6 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(Config.PORT, async () => {
-  await db.select({ id: wal_outbox.id }).from(wal_outbox).limit(1);
   KAKFA_CONFIG = await getTopicMap();
   console.log("WAL database connection successful");
   console.log(`Server is running on port ${Config.PORT}`);
