@@ -3,15 +3,18 @@ import express, { NextFunction, Request, Response } from "express";
 import Config from "./config";
 import { generateWal } from "./wal.service";
 import { TKafkaTopicMapResponse } from "@wal/config";
+import { startPgBoss } from "./pg-boss";
 
 export let KAKFA_CONFIG: TKafkaTopicMapResponse = new Map();
 
 const app = express();
+app.use(express.json());
 const getTopicMap = async (): Promise<TKafkaTopicMapResponse> => {
   const response = await fetch(`${Config.controlPlaneUrl}/get-topic-map`);
   const data: { topicMap: TKafkaTopicMapResponse } = await response.json();
   return data.topicMap;
 };
+await startPgBoss();
 
 app.get("/hi", (_req, res) => {
   res.send("Hello, World!");
@@ -22,8 +25,11 @@ app.get("/refresh-kafka-map", async (_req, res) => {
 });
 
 app.post("/generate-wal", async (req, res) => {
-  await generateWal(req.body);
-  res.send("WAL generated");
+  const result = await generateWal(req.body);
+  if (!result) {
+    return res.status(500).send("Failed to generate WAL");
+  }
+  res.status(200).send("WAL generated");
 });
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {

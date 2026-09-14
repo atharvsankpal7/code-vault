@@ -17,7 +17,9 @@ export const generateWal = async ({
   message,
 }: IGenerateWalRequest) => {
   const topicDetails = KAKFA_CONFIG.get(topicName);
-  if (!topicDetails) return false;
+  if (!topicDetails) {
+    throw new Error(`Topic details not found for topic ${topicName}`);
+  }
   const { operationType } = topicDetails;
 
   if (operationType === "kafka") {
@@ -31,7 +33,12 @@ export const generateWal = async ({
     });
     console.log(`Message sent to Kafka topic ${topicName}:`);
   } else if (operationType === "database") {
-    await boss.send(WAL_OUTBOX_QUEUE, { topic_name: topicName, message });
+    const { workerWaitTimeInMinutes } = topicDetails;
+    await boss.send(
+      WAL_OUTBOX_QUEUE,
+      { topic_name: topicName, message },
+      { expireInSeconds: workerWaitTimeInMinutes * 60 },
+    );
   }
   return true;
 };

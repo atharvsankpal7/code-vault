@@ -1,12 +1,16 @@
 import { KAKFA_CONFIG } from ".";
-import { boss, WAL_OUTBOX_QUEUE, startPgBoss } from "./pg-boss";
+import { performCpuTask } from "./cpu.worker.service";
+import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
 import { kafkaProducer } from "./wal.service";
 
 export const sendPendingMessageToKafka = async () => {
-  await startPgBoss();
   await boss.work<{ topic_name: string; message: string }>(
     WAL_OUTBOX_QUEUE,
-    { batchSize: 10, perJobResults: true },
+    {
+      batchSize: 1,
+      perJobResults: true,
+      localConcurrency: 4,
+    }, //batch size is changable but we keep it as one due to assumption of operation being cpu bound
     async (messages) => {
       return Promise.all(
         messages.map(async (m) => {
@@ -20,14 +24,13 @@ export const sendPendingMessageToKafka = async () => {
                 `topic not found in the kafka config: [messageId] ${m.id}`,
               );
             }
-            // perform the computation that we would want to perform and convert the raw message into something that our kafka should strore
-            // for demo i would just add something to the message
-            message.message = message.message + "hi";
+            // cpu bound task
+            const hashedMessage = await performCpuTask(message.message);
             await kafkaProducer.send({
               messages: [
                 {
                   topic: message.topic_name,
-                  value: message.message,
+                  value: hashedMessage,
                 },
               ],
               acks: ackValue,
