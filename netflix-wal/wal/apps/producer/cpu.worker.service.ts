@@ -5,24 +5,35 @@ export const performCpuTask = (
   iterations = 500_000,
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./workerNode.js", import.meta.url), {
+    let settled = false;
+    const worker = new Worker(new URL("./workerNode.ts", import.meta.url), {
+      execArgv: ["--import", "tsx"],
       workerData: {
         message,
         iterations,
       },
     });
 
+    const finish = (cb: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cb();
+    };
+
     worker.once("message", (result) => {
-      resolve(result);
+      finish(() => resolve(result));
+      void worker.terminate();
     });
 
     worker.once("error", (error) => {
-      reject(error);
+      finish(() => reject(error));
     });
 
     worker.once("exit", (code) => {
       if (code !== 0) {
-        reject(new Error(`Worker exited with code ${code}`));
+        finish(() => reject(new Error(`Worker exited with code ${code}`)));
       }
     });
   });

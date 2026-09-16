@@ -1,7 +1,7 @@
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
 import { kafkaProducer } from "./wal.service";
 import { performCpuTask } from "./cpu.worker.service";
-import { KAKFA_CONFIG } from ".";
+import { KAKFA_CONFIG } from "./kafka-config";
 export const sendPendingMessageToKafka = async () => {
   await boss.work<{ topic_name: string; message: string }>(
     WAL_OUTBOX_QUEUE,
