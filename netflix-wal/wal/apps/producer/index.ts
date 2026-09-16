@@ -5,7 +5,7 @@ import { generateWal } from "./wal.service";
 import { TKafkaTopicMapResponse } from "@wal/config";
 import { startPgBoss } from "./pg-boss";
 
-export let KAKFA_CONFIG: TKafkaTopicMapResponse = new Map();
+export let KAKFA_CONFIG: TKafkaTopicMapResponse = {};
 
 const app = express();
 app.use(express.json());

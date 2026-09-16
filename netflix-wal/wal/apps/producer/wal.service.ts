@@ -16,7 +16,7 @@ export const generateWal = async ({
   topicName,
   message,
 }: IGenerateWalRequest) => {
-  const topicDetails = KAKFA_CONFIG.get(topicName);
+  const topicDetails = KAKFA_CONFIG[topicName];
   if (!topicDetails) {
     throw new Error(`Topic details not found for topic ${topicName}`);
   }

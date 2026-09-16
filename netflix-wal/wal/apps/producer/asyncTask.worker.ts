@@ -16,9 +16,7 @@ export const sendPendingMessageToKafka = async () => {
           try {
             const message = m.data;
 
-            const ackValue = KAKFA_CONFIG.get(
-              message.topic_name,
-            )?.acknowledgement;
+            const ackValue = KAKFA_CONFIG[message.topic_name]?.acknowledgement;
 
             if (ackValue === undefined) {
               throw new Error(
