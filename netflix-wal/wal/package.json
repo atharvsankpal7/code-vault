@@ -5,8 +5,10 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev:producer": "pnpm --filter wal-producer dev",
+    "dev:producer-worker": "pnpm --filter wal-producer dev:worker",
     "dev:consumer": "pnpm --filter wal-consumer dev",
     "start:producer": "pnpm --filter wal-producer start",
+    "start:producer-worker": "pnpm --filter wal-producer start:worker",
     "start:consumer": "pnpm --filter wal-consumer start",
     "wal-db:generate": "pnpm exec drizzle-kit generate --config packages/wal-db/drizzle.config.ts",
     "wal-db:migrate": "pnpm exec drizzle-kit migrate --config packages/wal-db/drizzle.config.ts",

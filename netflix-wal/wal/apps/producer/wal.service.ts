@@ -1,7 +1,7 @@
 import { Producer, stringSerializers } from "@platformatic/kafka";
 import Config from "./config";
-import { KAKFA_CONFIG } from ".";
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
+import { KAKFA_CONFIG } from ".";
 interface IGenerateWalRequest {
   topicName: string;
   message: string;

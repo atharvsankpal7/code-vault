@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch index.ts",
-    "start": "tsx index.ts"
+    "dev:worker": "tsx watch worker.ts",
+    "start": "tsx index.ts",
+    "start:worker": "tsx worker.ts"
     
   },
   "keywords": [],
