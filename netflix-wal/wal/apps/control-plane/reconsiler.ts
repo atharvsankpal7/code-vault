@@ -37,22 +37,19 @@ export const reconsiler = async (admin: Admin) => {
         ),
       );
 
-    //note: batch if parallel topic creation becomes an issue
-    await Promise.all(
-      missingTopics.map((t) =>
-        admin.createTopics({
-          topics: [t.topicName],
-          partitions: t.numPartitions,
-          replicas: t.replicationFactor,
-          configs: [
-            {
-              name: "min.insync.replicas",
-              value: String(t.minInsyncReplicas),
-            },
-          ],
-        }),
-      ),
-    );
+    for (const t of missingTopics) {
+      await admin.createTopics({
+        topics: [t.topicName],
+        partitions: t.numPartitions,
+        replicas: t.replicationFactor,
+        configs: [
+          {
+            name: "min.insync.replicas",
+            value: String(t.minInsyncReplicas),
+          },
+        ],
+      }); 
+    }
 
     const currentTime = new Date();
     await db
@@ -141,12 +138,15 @@ export const reconsiler = async (admin: Admin) => {
     }
 
     const reconciledAt = new Date();
+    //build a sql query to update all at one time don't do anything like promise.all or do sequentially just build query dynamically and execute in single db trip
     await db
       .update(kafkaTopic)
       .set({
         last_reconciled_at: reconciledAt,
         reconciliation_status: "done",
-        reconciled_version: kafkaTopic.version,
+        reconciled_version: topicsOutOfVersion.find(
+          (t) => t.id === kafkaTopic.id,
+        )?.version,
       })
       .where(
         and(
