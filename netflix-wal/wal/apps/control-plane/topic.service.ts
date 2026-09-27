@@ -1,7 +1,6 @@
 import { Admin } from "@platformatic/kafka";
 import {
   TKafkaTopicMapResponse,
-  TopicDetails,
   TopicOperationType,
 } from "@wal/config";
 import db from "./control-plane-db";
@@ -12,7 +11,7 @@ export const getTopicMap = async (
   admin: Admin,
 ): Promise<TKafkaTopicMapResponse> => {
   const topicNameList = await admin.listTopics();
-  const topicMap = new Map<string, TopicDetails>();
+  const topicMap: TKafkaTopicMapResponse = {};
 
   if (topicNameList.length === 0) {
     return topicMap;
@@ -31,11 +30,11 @@ export const getTopicMap = async (
     .where(inArray(kafkaTopic.kafka_topic_name, topicNameList));
 
   for (const topic of topicDetailsFromDb) {
-    topicMap.set(topic.topicName, {
+    topicMap[topic.topicName] = {
       operationType: topic.operationType as TopicOperationType,
       workerWaitTimeInMinutes: topic.workerWaitTimeInMinutes,
       acknowledgement: topic.minInsyncReplicas, // -1 in database = all in kafka
-    });
+    };
   }
 
   return topicMap;

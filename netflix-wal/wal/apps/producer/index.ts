@@ -1,31 +1,28 @@
 import express, { NextFunction, Request, Response } from "express";
 
 import Config from "./config";
-import db from "@wal/wal-db";
-import { wal_outbox } from "@wal/wal-db/schema";
-import { KafkaConsumerGroupStates } from "@platformatic/kafka";
 import { generateWal } from "./wal.service";
-import { TKafkaTopicMapResponse } from "@wal/config";
-
-export let KAKFA_CONFIG: TKafkaTopicMapResponse = new Map();
+import { startPgBoss } from "./pg-boss";
+import { refreshTopicMap } from "./kafka-config";
 
 const app = express();
-const getTopicMap = async (): Promise<TKafkaTopicMapResponse> => {
-  const response = await fetch(`${Config.controlPlaneUrl}/get-topic-map`);
-  const data: { topicMap: TKafkaTopicMapResponse } = await response.json();
-  return data.topicMap;
-};
+app.use(express.json());
+await startPgBoss();
 
 app.get("/hi", (_req, res) => {
   res.send("Hello, World!");
 });
-
-app.get("/refresh-kafka-map", async (req, res) => {
-  KAKFA_CONFIG = await getTopicMap();
+app.get("/refresh-kafka-map", async (_req, res) => {
+  await refreshTopicMap();
+  res.send("Kafka map refreshed");
 });
 
-app.get("/generate-wal", async (req, res) => {
-  await generateWal(req.body);
+app.post("/generate-wal", async (req, res) => {
+  const result = await generateWal(req.body);
+  if (!result) {
+    return res.status(500).send("Failed to generate WAL");
+  }
+  res.status(200).send("WAL generated");
 });
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
@@ -39,8 +36,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(Config.PORT, async () => {
-  await db.select({ id: wal_outbox.id }).from(wal_outbox).limit(1);
-  KAKFA_CONFIG = await getTopicMap();
+  await refreshTopicMap();
   console.log("WAL database connection successful");
   console.log(`Server is running on port ${Config.PORT}`);
 });

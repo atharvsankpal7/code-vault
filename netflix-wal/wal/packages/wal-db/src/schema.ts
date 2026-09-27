@@ -17,7 +17,7 @@ export const getCreatedAtUpdatedAtForTableGeneration = () => {
   };
 };
 
-const outboxStatus = pgEnum("outbox_status", [
+export const outboxStatus = pgEnum("outbox_status", [
   "pending",
   "processing",
   "done",

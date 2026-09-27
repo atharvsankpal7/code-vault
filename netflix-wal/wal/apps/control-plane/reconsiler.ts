@@ -1,5 +1,5 @@
 import { Admin, ConfigResourceTypes } from "@platformatic/kafka";
-import { and, inArray, isNull, lt, or } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { kafkaTopic } from "./control-plane-db/schema";
@@ -37,37 +37,33 @@ export const reconsiler = async (admin: Admin) => {
         ),
       );
 
-    //note: batch if parallel topic creation becomes an issue
-    await Promise.all(
-      missingTopics.map((t) =>
-        admin.createTopics({
-          topics: [t.topicName],
-          partitions: t.numPartitions,
-          replicas: t.replicationFactor,
-          configs: [
-            {
-              name: "min.insync.replicas",
-              value: String(t.minInsyncReplicas),
-            },
-          ],
-        }),
-      ),
-    );
+    for (const t of missingTopics) {
+      await admin.createTopics({
+        topics: [t.topicName],
+        partitions: t.numPartitions,
+        replicas: t.replicationFactor,
+        configs: [
+          {
+            name: "min.insync.replicas",
+            value: String(t.minInsyncReplicas),
+          },
+        ],
+      });
 
-    const currentTime = new Date();
-    await db
-      .update(kafkaTopic)
-      .set({
-        reconciliation_status: "done",
-        last_reconciled_at: currentTime,
-        reconciled_version: kafkaTopic.version,
-      })
-      .where(
-        inArray(
-          kafkaTopic.kafka_topic_name,
-          missingTopics.map(({ topicName }) => topicName),
-        ),
-      );
+      // Stamp the version from the snapshot we acted on, not kafkaTopic.version.
+      // A concurrent bump then leaves reconciled_version < version, so the next
+      // run picks the topic up instead of silently reporting it as converged.
+      // Writing per topic also keeps already-created topics out of "inprogress"
+      // when a later topic in the loop fails.
+      await db
+        .update(kafkaTopic)
+        .set({
+          reconciliation_status: "done",
+          last_reconciled_at: new Date(),
+          reconciled_version: t.version,
+        })
+        .where(eq(kafkaTopic.id, t.id));
+    }
   }
   // Reconcile existing topics whose desired configuration has changed since the
   // last successful reconciliation.
@@ -140,26 +136,31 @@ export const reconsiler = async (admin: Admin) => {
       });
     }
 
-    const reconciledAt = new Date();
-    await db
-      .update(kafkaTopic)
-      .set({
-        last_reconciled_at: reconciledAt,
-        reconciliation_status: "done",
-        reconciled_version: kafkaTopic.version,
-      })
-      .where(
-        and(
-          inArray(
-            kafkaTopic.kafka_topic_name,
-            topicsOutOfVersion.map(({ topicName }) => topicName),
-          ),
-          or(
-            isNull(kafkaTopic.last_reconciled_at),
-            lt(kafkaTopic.last_reconciled_at, kafkaTopic.updated_at),
-          ),
-        ),
-      );
+    // One round trip, but each row needs its own version, which a shared SET
+    // clause cannot express. The versions ride in as a VALUES list joined on
+    // topic name. Casts are explicit because Postgres types bare VALUES
+    // literals as `unknown`/text in this join position.
+    const desiredVersions = sql.join(
+      topicsOutOfVersion.map(
+        (t) => sql`(${t.topicName}::text, ${t.version}::integer)`,
+      ),
+      sql`, `,
+    );
+
+    // `reconciled_version < v.version` replaces the old last_reconciled_at vs
+    // updated_at predicate: updated_at only moves via drizzle's $onUpdateFn, so
+    // a version bumped by raw SQL never matched it. Comparing versions also acts
+    // as a compare-and-swap, so a concurrent run that already stamped a higher
+    // version is never regressed.
+    await db.execute(sql`
+      update ${kafkaTopic}
+      set reconciled_version = v.version,
+          reconciliation_status = 'done',
+          last_reconciled_at = now()
+      from (values ${desiredVersions}) as v(topic_name, version)
+      where ${kafkaTopic.kafka_topic_name} = v.topic_name
+        and ${kafkaTopic.reconciled_version} < v.version
+    `);
   }
 
   return missingTopics.length !== 0 || topicsOutOfVersion.length !== 0;

@@ -1,28 +1,29 @@
-import db from "@wal/wal-db";
 import { Producer, stringSerializers } from "@platformatic/kafka";
 import Config from "./config";
-import { wal_outbox } from "@wal/wal-db/schema";
-import { KAKFA_CONFIG } from ".";
+import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
+import { KAKFA_CONFIG } from "./kafka-config";
 interface IGenerateWalRequest {
   topicName: string;
   message: string;
 }
+export const kafkaProducer = new Producer({
+  clientId: Config.clientId,
+  bootstrapBrokers: Config.kafkaBrokers.split(","),
+  serializers: stringSerializers,
+});
+
 export const generateWal = async ({
   topicName,
   message,
 }: IGenerateWalRequest) => {
-  const topicDetails = KAKFA_CONFIG.get(topicName);
-  if (!topicDetails) return false;
+  const topicDetails = KAKFA_CONFIG[topicName];
+  if (!topicDetails) {
+    throw new Error(`Topic details not found for topic ${topicName}`);
+  }
   const { operationType } = topicDetails;
 
   if (operationType === "kafka") {
-    const producer = new Producer({
-      clientId: Config.clientId,
-      bootstrapBrokers: Config.kafkaBrokers.split(","),
-      serializers: stringSerializers,
-    });
-
-    const result = await producer.send({
+    await kafkaProducer.send({
       messages: [
         {
           topic: topicName,
@@ -30,10 +31,14 @@ export const generateWal = async ({
         },
       ],
     });
+    console.log(`Message sent to Kafka topic ${topicName}:`);
   } else if (operationType === "database") {
-    await db
-      .insert(wal_outbox)
-      .values({ topic_name: topicName, message, status: "pending" });
+    const { workerWaitTimeInMinutes } = topicDetails;
+    await boss.send(
+      WAL_OUTBOX_QUEUE,
+      { topic_name: topicName, message },
+      { expireInSeconds: workerWaitTimeInMinutes * 60 },
+    );
   }
   return true;
 };
