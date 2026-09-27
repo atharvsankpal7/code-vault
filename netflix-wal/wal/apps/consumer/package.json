@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@wal/config": "workspace:*",
+    "@wal/wal-db": "workspace:*",
     "express": "^5.2.1",
     "kafkajs": "^2.2.4"
   },

@@ -50,11 +50,6 @@ export const reconsiler = async (admin: Admin) => {
         ],
       });
 
-      // Stamp the version from the snapshot we acted on, not kafkaTopic.version.
-      // A concurrent bump then leaves reconciled_version < version, so the next
-      // run picks the topic up instead of silently reporting it as converged.
-      // Writing per topic also keeps already-created topics out of "inprogress"
-      // when a later topic in the loop fails.
       await db
         .update(kafkaTopic)
         .set({
@@ -136,10 +131,6 @@ export const reconsiler = async (admin: Admin) => {
       });
     }
 
-    // One round trip, but each row needs its own version, which a shared SET
-    // clause cannot express. The versions ride in as a VALUES list joined on
-    // topic name. Casts are explicit because Postgres types bare VALUES
-    // literals as `unknown`/text in this join position.
     const desiredVersions = sql.join(
       topicsOutOfVersion.map(
         (t) => sql`(${t.topicName}::text, ${t.version}::integer)`,
@@ -147,11 +138,6 @@ export const reconsiler = async (admin: Admin) => {
       sql`, `,
     );
 
-    // `reconciled_version < v.version` replaces the old last_reconciled_at vs
-    // updated_at predicate: updated_at only moves via drizzle's $onUpdateFn, so
-    // a version bumped by raw SQL never matched it. Comparing versions also acts
-    // as a compare-and-swap, so a concurrent run that already stamped a higher
-    // version is never regressed.
     await db.execute(sql`
       update ${kafkaTopic}
       set reconciled_version = v.version,
