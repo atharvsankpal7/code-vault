@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts"
+    "dev": "tsx watch index.ts",
+    "start": "tsx index.ts"
   },
   "dependencies": {
     "@wal/config": "workspace:*",

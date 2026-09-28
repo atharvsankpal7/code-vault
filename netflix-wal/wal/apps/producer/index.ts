@@ -7,7 +7,6 @@ import { refreshTopicMap } from "./kafka-config";
 
 const app = express();
 app.use(express.json());
-await startPgBoss();
 
 app.get("/hi", (_req, res) => {
   res.send("Hello, World!");
@@ -37,6 +36,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(Config.PORT, async () => {
   await refreshTopicMap();
+  await startPgBoss();
   console.log("WAL database connection successful");
   console.log(`Server is running on port ${Config.PORT}`);
 });

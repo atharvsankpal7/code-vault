@@ -7,6 +7,7 @@ import { getTopicMap } from "./topic.service";
 import { Admin } from "@platformatic/kafka";
 
 const app = express();
+console.log(Config.kafkaBrokers);
 
 // const runReconsiler = () => {
 //   setTimeout(async () => {
@@ -36,6 +37,12 @@ app.get("/get-topic-map", async (_req: Request, res: Response) => {
   res.status(200).send({ topicMap: topicMap });
 });
 
+app.listen(Config.PORT, () => {
+  console.log({ x: Config.kafkaBrokers, y: Config.kafkaBrokers.split(",") });
+  console.log(`control-plane for WAL running on ${Config.PORT}`);
+});
+
+// runReconsiler();
 // Must be registered after all routes so it handles errors from the application.
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error("Unhandled request error:", error);
@@ -46,9 +53,3 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 
   res.status(500).json({ error: "Internal server error" });
 });
-
-app.listen(Config.PORT, () => {
-  console.log(`control-plane for WAL running on ${Config.PORT}`);
-});
-
-// runReconsiler();
