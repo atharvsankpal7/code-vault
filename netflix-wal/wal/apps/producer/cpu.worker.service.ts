@@ -1,4 +1,5 @@
 import { Worker } from "node:worker_threads";
+import { join } from "node:path";
 
 export const performCpuTask = (
   message: string,
@@ -6,7 +7,7 @@ export const performCpuTask = (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     let settled = false;
-    const worker = new Worker(new URL("./workerNode.ts", import.meta.url), {
+    const worker = new Worker(join(__dirname, "workerNode.ts"), {
       execArgv: ["--import", "tsx"],
       workerData: {
         message,
