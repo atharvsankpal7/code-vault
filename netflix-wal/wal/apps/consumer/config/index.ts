@@ -1,3 +1,4 @@
+import "dotenv/config";
 import GlobalConfig, { validateConfig } from "@wal/config";
 
 const localConfig = validateConfig({
