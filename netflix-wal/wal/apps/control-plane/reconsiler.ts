@@ -7,8 +7,8 @@ import { kafkaTopic } from "./control-plane-db/schema";
 
 const log = createLogger("control-plane:reconciler");
 
-// Runs as one transaction holding FOR UPDATE locks on every topic row, so
-// concurrent reconciles and topic patches wait for it instead of racing it.
+// Runs as one transaction holding FOR UPDATE locks on the topic rows it reads.
+// SKIP LOCKED leaves rows held by a patch or another reconcile to the next pass.
 export const reconsiler = async (admin: Admin) =>
   db.transaction(async (tx) => {
     const [kafkaTopicList, dbTopicList] = await Promise.all([
@@ -25,7 +25,7 @@ export const reconsiler = async (admin: Admin) =>
           reconciled_version: kafkaTopic.reconciled_version,
         })
         .from(kafkaTopic)
-        .for("update"),
+        .for("update", { skipLocked: true }),
     ]);
 
     log.debug(
