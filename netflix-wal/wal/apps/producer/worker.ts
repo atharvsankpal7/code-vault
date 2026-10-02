@@ -1,9 +1,9 @@
 import { startPgBoss } from "./pg-boss";
 import { createLogger } from "@wal/logger";
-
-const log = createLogger("producer:worker");
 import { refreshTopicMap } from "./kafka-config";
 import { sendPendingMessageToKafka } from "./asyncTask.worker";
+
+const log = createLogger("producer:worker");
 
 async function start() {
   await startPgBoss();

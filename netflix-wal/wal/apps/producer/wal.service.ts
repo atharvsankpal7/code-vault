@@ -1,10 +1,11 @@
 import { Producer, stringSerializers } from "@platformatic/kafka";
 import { createLogger } from "@wal/logger";
-
-const log = createLogger("producer:wal");
 import Config from "./config";
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
 import { KAKFA_CONFIG } from "./kafka-config";
+
+const log = createLogger("producer:wal");
+
 interface IGenerateWalRequest {
   topicName: string;
   message: string;
@@ -21,6 +22,7 @@ export const generateWal = async ({
 }: IGenerateWalRequest) => {
   const topicDetails = KAKFA_CONFIG[topicName];
   if (!topicDetails) {
+    log.warn(`Rejected WAL request for unknown topic ${topicName}`);
     throw new Error(`Topic details not found for topic ${topicName}`);
   }
   const { operationType } = topicDetails;
@@ -42,6 +44,7 @@ export const generateWal = async ({
       { topic_name: topicName, message },
       { expireInSeconds: workerWaitTimeInMinutes * 60 },
     );
+    log.info(`Message queued in outbox for topic ${topicName}`);
   }
   return true;
 };

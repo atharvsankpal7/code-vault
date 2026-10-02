@@ -1,9 +1,8 @@
 import express, { NextFunction, Request, Response } from "express";
 import { createLogger } from "@wal/logger";
+import Config from "./config";
 
 const log = createLogger("consumer:api");
-
-import Config from "./config";
 
 const app = express();
 app.use(express.json());

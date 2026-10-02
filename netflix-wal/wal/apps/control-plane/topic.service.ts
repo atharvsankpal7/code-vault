@@ -6,6 +6,9 @@ import {
 import db from "./control-plane-db";
 import { kafkaTopic } from "./control-plane-db/schema";
 import { inArray } from "drizzle-orm";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("control-plane:topic-service");
 
 export const getTopicMap = async (
   admin: Admin,
@@ -14,6 +17,7 @@ export const getTopicMap = async (
   const topicMap: TKafkaTopicMapResponse = {};
 
   if (topicNameList.length === 0) {
+    log.warn("No topics found in kafka, returning empty topic map");
     return topicMap;
   }
 
@@ -37,5 +41,6 @@ export const getTopicMap = async (
     };
   }
 
+  log.debug(`Built topic map for ${topicDetailsFromDb.length} topics`);
   return topicMap;
 };

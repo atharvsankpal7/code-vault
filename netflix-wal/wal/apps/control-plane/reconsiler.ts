@@ -1,11 +1,11 @@
 import { Admin, ConfigResourceTypes } from "@platformatic/kafka";
 import { createLogger } from "@wal/logger";
-
-const log = createLogger("control-plane:reconciler");
 import { eq, inArray, sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { kafkaTopic } from "./control-plane-db/schema";
+
+const log = createLogger("control-plane:reconciler");
 
 export const reconsiler = async (admin: Admin) => {
   const [kafkaTopicList, dbTopicList] = await Promise.all([
@@ -24,12 +24,16 @@ export const reconsiler = async (admin: Admin) => {
       .from(kafkaTopic),
   ]);
 
+  log.debug(
+    `Reconciling ${dbTopicList.length} db topics against ${kafkaTopicList.length} kafka topics`,
+  );
   const existingKafkaTopics = new Set(kafkaTopicList);
   const missingTopics = dbTopicList.filter(
     ({ topicName }) => !existingKafkaTopics.has(topicName),
   );
 
   if (missingTopics.length !== 0) {
+    log.info(`Creating ${missingTopics.length} missing topics in kafka`);
     await db
       .update(kafkaTopic)
       .set({ reconciliation_status: "inprogress" })
@@ -61,6 +65,7 @@ export const reconsiler = async (admin: Admin) => {
           reconciled_version: t.version,
         })
         .where(eq(kafkaTopic.id, t.id));
+      log.info(`Created topic ${t.topicName} at version ${t.version}`);
     }
   }
   // Reconcile existing topics whose desired configuration has changed since the
@@ -104,6 +109,9 @@ export const reconsiler = async (admin: Admin) => {
   });
 
   if (topicsOutOfVersion.length !== 0) {
+    log.info(
+      `Reconciling ${topicsOutOfVersion.length} out-of-version topics, ${outOf_MinISR_Topics.length} need min.insync.replicas update`,
+    );
     await admin.alterConfigs({
       resources: outOf_MinISR_Topics.map(
         ({ topicName, minInsyncReplicas }) => ({
@@ -125,6 +133,9 @@ export const reconsiler = async (admin: Admin) => {
     });
 
     if (outOfPartitionOrderTopics.length > 0) {
+      log.info(
+        `Increasing partitions for ${outOfPartitionOrderTopics.map((t) => t.topicName).join(", ")}`,
+      );
       await admin.createPartitions({
         topics: outOfPartitionOrderTopics.map((t) => ({
           name: t.topicName,
@@ -150,6 +161,7 @@ export const reconsiler = async (admin: Admin) => {
       where ${kafkaTopic.kafka_topic_name} = v.topic_name
         and ${kafkaTopic.reconciled_version} < v.version
     `);
+    log.info("Reconciled versions updated in database");
   }
 
   return missingTopics.length !== 0 || topicsOutOfVersion.length !== 0;

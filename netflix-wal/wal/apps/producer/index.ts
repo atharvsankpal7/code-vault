@@ -1,12 +1,11 @@
 import express, { NextFunction, Request, Response } from "express";
 import { createLogger } from "@wal/logger";
-
-const log = createLogger("producer:api");
-
 import Config from "./config";
 import { generateWal } from "./wal.service";
 import { startPgBoss } from "./pg-boss";
 import { refreshTopicMap } from "./kafka-config";
+
+const log = createLogger("producer:api");
 
 const app = express();
 app.use(express.json());

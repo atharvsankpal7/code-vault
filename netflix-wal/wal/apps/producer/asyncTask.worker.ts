@@ -1,10 +1,11 @@
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
 import { createLogger } from "@wal/logger";
-
-const log = createLogger("producer:outbox-worker");
 import { kafkaProducer } from "./wal.service";
 import { performCpuTask } from "./cpu.worker.service";
 import { KAKFA_CONFIG } from "./kafka-config";
+
+const log = createLogger("producer:outbox-worker");
+
 export const sendPendingMessageToKafka = async () => {
   await boss.work<{ topic_name: string; message: string }>(
     WAL_OUTBOX_QUEUE,
@@ -18,6 +19,7 @@ export const sendPendingMessageToKafka = async () => {
         messages.map(async (m) => {
           try {
             const message = m.data;
+            log.debug(`Processing outbox job ${m.id} for ${message.topic_name}`);
 
             const ackValue = KAKFA_CONFIG[message.topic_name]?.acknowledgement;
 

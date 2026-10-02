@@ -1,13 +1,13 @@
 import express, { NextFunction, Request, Response } from "express";
 import { createLogger } from "@wal/logger";
-
-const log = createLogger("control-plane:api");
 import { sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { reconsiler } from "./reconsiler";
 import { getTopicMap } from "./topic.service";
 import { Admin } from "@platformatic/kafka";
+
+const log = createLogger("control-plane:api");
 
 const app = express();
 log.debug("Kafka brokers configured", Config.kafkaBrokers);
@@ -31,12 +31,15 @@ const admin = new Admin({
   bootstrapBrokers: Config.kafkaBrokers.split(","),
 });
 app.get("/reconsile", async (_req: Request, res: Response) => {
+  log.info("Reconciliation requested");
   const topicChanged = await reconsiler(admin);
+  log.info(`Reconciliation finished, topicChanged=${topicChanged}`);
   res.status(200).send({ topicChanged });
 });
 
 app.get("/get-topic-map", async (_req: Request, res: Response) => {
   const topicMap = await getTopicMap(admin);
+  log.debug(`Serving topic map with ${Object.keys(topicMap).length} topics`);
   res.status(200).send({ topicMap: topicMap });
 });
 
