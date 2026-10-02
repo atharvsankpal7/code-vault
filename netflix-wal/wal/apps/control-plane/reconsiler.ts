@@ -1,4 +1,7 @@
 import { Admin, ConfigResourceTypes } from "@platformatic/kafka";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("control-plane:reconciler");
 import { eq, inArray, sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
@@ -68,7 +71,7 @@ export const reconsiler = async (admin: Admin) => {
       (reconciled_version === null || reconciled_version < version),
   );
   if (topicsOutOfVersion.length === 0) {
-    console.log("no topics out of version");
+    log.info("no topics out of version");
     return missingTopics.length !== 0;
   }
   const [topicMetadataLista, kafkaTopicReplicas] = await Promise.all([

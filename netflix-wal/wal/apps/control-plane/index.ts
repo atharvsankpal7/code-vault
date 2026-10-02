@@ -1,4 +1,7 @@
 import express, { NextFunction, Request, Response } from "express";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("control-plane:api");
 import { sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
@@ -7,7 +10,7 @@ import { getTopicMap } from "./topic.service";
 import { Admin } from "@platformatic/kafka";
 
 const app = express();
-console.log(Config.kafkaBrokers);
+log.debug("Kafka brokers configured", Config.kafkaBrokers);
 
 // const runReconsiler = () => {
 //   setTimeout(async () => {
@@ -38,14 +41,14 @@ app.get("/get-topic-map", async (_req: Request, res: Response) => {
 });
 
 app.listen(Config.PORT, () => {
-  console.log({ x: Config.kafkaBrokers, y: Config.kafkaBrokers.split(",") });
-  console.log(`control-plane for WAL running on ${Config.PORT}`);
+  log.debug("Kafka broker list", Config.kafkaBrokers.split(","));
+  log.info(`control-plane for WAL running on ${Config.PORT}`);
 });
 
 // runReconsiler();
 // Must be registered after all routes so it handles errors from the application.
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Unhandled request error:", error);
+  log.error("Unhandled request error:", error);
 
   if (res.headersSent) {
     return;

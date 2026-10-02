@@ -1,4 +1,7 @@
 import express, { NextFunction, Request, Response } from "express";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("consumer:api");
 
 import Config from "./config";
 
@@ -10,7 +13,7 @@ app.get("/hi", (_req, res) => {
 });
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error("Unhandled request error:", error);
+  log.error("Unhandled request error:", error);
 
   if (res.headersSent) {
     return;
@@ -20,6 +23,6 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(Config.PORT, async () => {
-  console.log("WAL database connection successful");
-  console.log(`Server is running on port ${Config.PORT}`);
+  log.info("WAL database connection successful");
+  log.info(`Server is running on port ${Config.PORT}`);
 });

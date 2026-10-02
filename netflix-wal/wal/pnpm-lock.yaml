@@ -27,6 +27,9 @@ importers:
       '@wal/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@wal/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@wal/wal-db':
         specifier: workspace:*
         version: link:../../packages/wal-db
@@ -58,6 +61,9 @@ importers:
       '@wal/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@wal/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@wal/wal-db':
         specifier: workspace:*
         version: link:../../packages/wal-db
@@ -95,6 +101,9 @@ importers:
       '@wal/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@wal/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@wal/wal-db':
         specifier: workspace:*
         version: link:../../packages/wal-db
@@ -128,6 +137,19 @@ importers:
         version: 7.0.2
 
   packages/config:
+    dependencies:
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+    devDependencies:
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/logger:
     dependencies:
       dotenv:
         specifier: ^17.4.2

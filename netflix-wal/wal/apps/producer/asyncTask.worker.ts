@@ -1,4 +1,7 @@
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("producer:outbox-worker");
 import { kafkaProducer } from "./wal.service";
 import { performCpuTask } from "./cpu.worker.service";
 import { KAKFA_CONFIG } from "./kafka-config";
@@ -39,7 +42,7 @@ export const sendPendingMessageToKafka = async () => {
               acks: ackValue,
             });
 
-            console.log(
+            log.info(
               `message ${m.id} sent to ${message.topic_name} in kafka`,
             );
 
@@ -48,7 +51,7 @@ export const sendPendingMessageToKafka = async () => {
               status: "completed",
             };
           } catch (err: any) {
-            console.error(`error for ${m.id}: ${err}`);
+            log.error(`Failed to send message ${m.id}`, err);
 
             return err.fatal
               ? {

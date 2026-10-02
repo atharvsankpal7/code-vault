@@ -1,4 +1,7 @@
 import { PgBoss } from "pg-boss";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("producer:pg-boss");
 import Config from "./config";
 
 export const WAL_OUTBOX_QUEUE = "wal-outbox";
@@ -10,7 +13,7 @@ export const boss = new PgBoss({
   reindex: { maxIndexBytes: 1024 * 1024 * 1024 }, //reindex every 1GB
 });
 
-boss.on("error", console.error);
+boss.on("error", (error) => log.error("pg-boss error", error));
 
 export async function startPgBoss() {
   await boss.start();

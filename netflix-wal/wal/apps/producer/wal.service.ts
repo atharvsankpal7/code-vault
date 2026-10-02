@@ -1,4 +1,7 @@
 import { Producer, stringSerializers } from "@platformatic/kafka";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("producer:wal");
 import Config from "./config";
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
 import { KAKFA_CONFIG } from "./kafka-config";
@@ -31,7 +34,7 @@ export const generateWal = async ({
         },
       ],
     });
-    console.log(`Message sent to Kafka topic ${topicName}:`);
+    log.info(`Message sent to Kafka topic ${topicName}`);
   } else if (operationType === "database") {
     const { workerWaitTimeInMinutes } = topicDetails;
     await boss.send(
