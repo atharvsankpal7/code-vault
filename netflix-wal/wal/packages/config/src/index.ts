@@ -1,5 +1,9 @@
 import path from "node:path";
 import dotenv from "dotenv";
+import { z } from "zod";
+import { createLogger } from "@wal/logger";
+
+const log = createLogger("schema-validator");
 
 dotenv.config({
   path: path.resolve(__dirname, "../../../.env"),
@@ -45,3 +49,16 @@ export interface TopicDetails {
 export type TKafkaTopicMapResponse = Record<string, TopicDetails>;
 
 export default GlobalConfig;
+
+export function validateType<T extends z.ZodType>(
+  schema: T,
+  object_: unknown,
+): z.output<T> {
+  try {
+    return schema.parse(object_);
+  } catch (err: unknown) {
+    log.error("error parsing schema");
+    throw err;
+  }
+}
+export { z as zod };

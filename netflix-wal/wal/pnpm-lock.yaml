@@ -138,9 +138,15 @@ importers:
 
   packages/config:
     dependencies:
+      '@wal/logger':
+        specifier: workspace:*
+        version: link:../logger
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      zod:
+        specifier: ^4.5.4
+        version: 4.5.4
     devDependencies:
       tsx:
         specifier: ^4.23.12
