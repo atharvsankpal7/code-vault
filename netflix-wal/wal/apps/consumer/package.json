@@ -7,12 +7,14 @@
     "start": "tsx index.ts"
   },
   "dependencies": {
+    "@platformatic/kafka": "^2.11.0",
     "@wal/config": "workspace:*",
     "@wal/logger": "workspace:*",
     "@wal/wal-db": "workspace:*",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

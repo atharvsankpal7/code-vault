@@ -60,10 +60,14 @@ app.patch("/topic/:topicName", async (req: Request, res: Response) => {
   res.status(200).send({ topic });
 });
 
-app.get("/get-topic-map", async (_req: Request, res: Response) => {
+app.get("/get-producer-topic-map", async (_req: Request, res: Response) => {
   const topicMap = await getTopicMap(admin);
   log.debug(`Serving topic map with ${Object.keys(topicMap).length} topics`);
   res.status(200).send({ topicMap: topicMap });
+});
+
+app.get("/get-consumer-topic-map", async (_req: Request, res: Response) => {
+  const topicMap = await getConsumerTopicMap(admin);
 });
 
 app.listen(Config.PORT, () => {

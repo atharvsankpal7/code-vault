@@ -13,7 +13,7 @@ app.use(express.json());
 app.get("/hi", (_req, res) => {
   res.send("Hello, World!");
 });
-app.get("/refresh-kafka-map", async (_req, res) => {
+app.get("/refresh-producer-kafka-map", async (_req, res) => {
   await refreshTopicMap();
   res.send("Kafka map refreshed");
 });

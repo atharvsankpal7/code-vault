@@ -1,6 +1,7 @@
 import { Admin } from "@platformatic/kafka";
 import {
-  TKafkaTopicMapResponse,
+  TKafkaConsumerTopicMapResponse,
+  TKafkaProducerTopicMapResponse,
   TopicOperationType,
 } from "@wal/config";
 import db from "./control-plane-db";
@@ -12,9 +13,9 @@ const log = createLogger("control-plane:topic-service");
 
 export const getTopicMap = async (
   admin: Admin,
-): Promise<TKafkaTopicMapResponse> => {
+): Promise<TKafkaProducerTopicMapResponse> => {
   const topicNameList = await admin.listTopics();
-  const topicMap: TKafkaTopicMapResponse = {};
+  const topicMap: TKafkaProducerTopicMapResponse = {};
 
   if (topicNameList.length === 0) {
     log.warn("No topics found in kafka, returning empty topic map");
@@ -42,5 +43,14 @@ export const getTopicMap = async (
   }
 
   log.debug(`Built topic map for ${topicDetailsFromDb.length} topics`);
+  return topicMap;
+};
+
+export const getConsumerTopicMap = async (
+  admin: Admin,
+): Promise<TKafkaConsumerTopicMapResponse> => {
+  const topicMap: TKafkaConsumerTopicMapResponse = {};
+  const topicList = admin.listTopics();
+
   return topicMap;
 };

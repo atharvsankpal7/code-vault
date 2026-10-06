@@ -46,7 +46,12 @@ export interface TopicDetails {
   acknowledgement: number;
 }
 
-export type TKafkaTopicMapResponse = Record<string, TopicDetails>;
+export type TKafkaProducerTopicMapResponse = Record<string, TopicDetails>;
+
+export type TKafkaConsumerTopicMapResponse = Record<
+  string,
+  { serviceName: string }
+>;
 
 export default GlobalConfig;
 

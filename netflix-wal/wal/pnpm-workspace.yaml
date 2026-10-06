@@ -1,3 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# drizzle-kit 0.31.10 uses tsx; its deprecated loader dependency is unused.
+overrides:
+  "drizzle-kit@0.31.10>@esbuild-kit/esm-loader": "-"
