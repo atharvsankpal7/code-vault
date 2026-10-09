@@ -58,8 +58,8 @@ export const deliveryTarget = pgTable("delivery_target", {
 
 export const targetTopicSubscription = pgTable("target_topic_subscription", {
   id: serial("id").primaryKey(),
-  kafka_topic_id: integer("kafka_topic_id")
-    .references(() => kafkaTopic.id)
+  kafka_topic_name: text("kafka_topic_name")
+    .references(() => kafkaTopic.kafka_topic_name)
     .notNull(),
   delivery_target_id: integer("delivery_target_id")
     .references(() => deliveryTarget.id)

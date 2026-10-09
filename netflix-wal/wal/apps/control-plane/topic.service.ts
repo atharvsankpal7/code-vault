@@ -5,8 +5,12 @@ import {
   TopicOperationType,
 } from "@wal/config";
 import db from "./control-plane-db";
-import { kafkaTopic } from "./control-plane-db/schema";
-import { inArray } from "drizzle-orm";
+import {
+  deliveryTarget,
+  kafkaTopic,
+  targetTopicSubscription,
+} from "./control-plane-db/schema";
+import { eq, inArray, sql } from "drizzle-orm";
 import { createLogger } from "@wal/logger";
 
 const log = createLogger("control-plane:topic-service");
@@ -48,9 +52,47 @@ export const getTopicMap = async (
 
 export const getConsumerTopicMap = async (
   admin: Admin,
+  topicName?: string,
 ): Promise<TKafkaConsumerTopicMapResponse> => {
   const topicMap: TKafkaConsumerTopicMapResponse = {};
-  const topicList = admin.listTopics();
+  let topicList = await admin.listTopics();
+  if (topicName) {
+    if (!topicList.includes(topicName)) {
+      throw new Error("Given topic not present in the kafka");
+    }
+    topicList = [topicName];
+  }
+
+  const topicDetails = await db
+    .select({
+      topic: targetTopicSubscription.kafka_topic_name,
+      deliveryTargetDetails: sql<
+        Array<{
+          targetName: string;
+          communication_type: string;
+          endpoint: string;
+          timeout: number;
+        }>
+      >`json_agg(
+        json_build_object(
+          'targetName', ${deliveryTarget.target_name},
+          'communication_type', ${deliveryTarget.endpoint_communication_type},
+          'endpoint', ${deliveryTarget.endpoint},
+          'timeout', ${deliveryTarget.timeout}
+        )
+      )`.as("deliveryTargetDetails"),
+    })
+    .from(targetTopicSubscription)
+    .innerJoin(
+      deliveryTarget,
+      eq(targetTopicSubscription.delivery_target_id, deliveryTarget.id),
+    )
+    .where(inArray(targetTopicSubscription.kafka_topic_name, topicList))
+    .groupBy(targetTopicSubscription.kafka_topic_name);
+
+  for (const row of topicDetails) {
+    topicMap[row.topic] = row.deliveryTargetDetails;
+  }
 
   return topicMap;
 };

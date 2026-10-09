@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { reconsiler } from "./reconsiler";
-import { getTopicMap } from "./topic.service";
+import { getConsumerTopicMap, getTopicMap } from "./topic.service";
 import { Admin } from "@platformatic/kafka";
 import { validateType } from "@wal/config";
 import { createTopicSchema, updateTopicSchema } from "@wal/config/types";
@@ -67,7 +67,7 @@ app.get("/get-producer-topic-map", async (_req: Request, res: Response) => {
 });
 
 app.get("/get-consumer-topic-map", async (_req: Request, res: Response) => {
-  const topicMap = await getConsumerTopicMap(admin);
+  await getConsumerTopicMap(admin);
 });
 
 app.listen(Config.PORT, () => {
@@ -75,14 +75,14 @@ app.listen(Config.PORT, () => {
   log.info(`control-plane for WAL running on ${Config.PORT}`);
 });
 
-// runReconsiler();
-// Must be registered after all routes so it handles errors from the application.
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   log.error("Unhandled request error:", error);
 
   if (res.headersSent) {
     return;
   }
-
+  if (error instanceof Error) {
+    log.error(error.message);
+  }
   res.status(500).json({ error: "Internal server error" });
 });

@@ -1,6 +1,7 @@
 import express, { NextFunction, Request, Response } from "express";
 import { createLogger } from "@wal/logger";
 import Config from "./config";
+import { refreshConsumerTopicMap } from "./kafka-config";
 
 const log = createLogger("consumer:api");
 
@@ -11,7 +12,10 @@ app.get("/hi", (_req, res) => {
   res.send("Hello, World!");
 });
 
-app.get("/refresh-consumer-kafka-map");
+app.get("/refresh-consumer-kafka-map", async (_req: Request, res: Response) => {
+  await refreshConsumerTopicMap();
+  res.send("fetched updated kafka topic-service relation");
+});
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   log.error("Unhandled request error:", error);
@@ -20,6 +24,6 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(Config.PORT, async () => {
-  log.info("WAL database connection successful");
-  log.info(`Server is running on port ${Config.PORT}`);
+  await refreshConsumerTopicMap();
+  log.info(`Consumer is running on port ${Config.PORT}`);
 });

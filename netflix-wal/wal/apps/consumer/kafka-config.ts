@@ -1,21 +1,21 @@
-import { TKafkaProducerTopicMapResponse } from "@wal/config";
+import { TKafkaConsumerTopicMapResponse } from "@wal/config";
 import Config from "./config";
 import { createLogger } from "@wal/logger";
 
-const log = createLogger("producer:kafka-config");
+const log = createLogger("consumer:kafka-config");
 
-export let KAKFA_CONFIG: TKafkaProducerTopicMapResponse = {};
+export let KAKFA_CONFIG: TKafkaConsumerTopicMapResponse = {};
 
-export const refreshTopicMap =
-  async (): Promise<TKafkaProducerTopicMapResponse> => {
+export const refreshConsumerTopicMap =
+  async (): Promise<TKafkaConsumerTopicMapResponse> => {
     log.debug("Refreshing topic map from control-plane");
     const response = await fetch(
-      `${Config.controlPlaneUrl}/get-producer-topic-map`,
+      `${Config.controlPlaneUrl}/get-consumer-topic-map`,
     );
     if (!response.ok) {
       log.error(`Control-plane returned ${response.status} for topic map`);
     }
-    const data: { topicMap: TKafkaProducerTopicMapResponse } =
+    const data: { topicMap: TKafkaConsumerTopicMapResponse } =
       await response.json();
     KAKFA_CONFIG = data.topicMap ?? {};
     log.info(

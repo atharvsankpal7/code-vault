@@ -48,10 +48,14 @@ export interface TopicDetails {
 
 export type TKafkaProducerTopicMapResponse = Record<string, TopicDetails>;
 
-export type TKafkaConsumerTopicMapResponse = Record<
-  string,
-  { serviceName: string }
->;
+export interface TDeliveryTarget {
+  targetName: string;
+  communication_type: string;
+  endpoint: string;
+  timeout: number;
+}
+
+export type TKafkaConsumerTopicMapResponse = Record<string, TDeliveryTarget[]>;
 
 export default GlobalConfig;
 
