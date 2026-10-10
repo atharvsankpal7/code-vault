@@ -33,11 +33,13 @@ export async function startConsumer() {
     );
     try {
       // todo: check how can we batch the message sending
-      const response = await sendMessageToTarget(
+      await sendMessageToTarget(
         message,
         topicDetails.communication_type,
         topicDetails.endpoint,
         topicDetails.timeout,
+        Config.serviceSpecificClientName,
+        message.topic,
       );
     } catch (err) {
       log.error("Processing failed", err);

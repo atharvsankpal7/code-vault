@@ -7,17 +7,22 @@
     "start": "tsx index.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1149.0",
     "@platformatic/kafka": "^2.11.0",
+    "@smithy/node-http-handler": "^4.12.1",
     "@wal/config": "workspace:*",
     "@wal/logger": "workspace:*",
     "@wal/wal-db": "workspace:*",
+    "axios": "^1.20.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "kafkajs": "^2.2.4",
+    "pg": "^8.23.0",
     "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/pg": "^8.23.1",
     "tsx": "^4.23.12",
     "typescript": "^7.0.0"
   }
