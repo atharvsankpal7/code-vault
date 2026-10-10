@@ -67,7 +67,11 @@ app.get("/get-producer-topic-map", async (_req: Request, res: Response) => {
 });
 
 app.get("/get-consumer-topic-map", async (_req: Request, res: Response) => {
-  await getConsumerTopicMap(admin);
+  const topicMap = await getConsumerTopicMap(admin);
+  log.debug(
+    `Serving consumer topic map with ${Object.keys(topicMap).length} services`,
+  );
+  res.status(200).send({ topicMap: topicMap });
 });
 
 app.listen(Config.PORT, () => {

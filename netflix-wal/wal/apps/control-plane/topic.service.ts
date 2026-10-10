@@ -10,7 +10,7 @@ import {
   kafkaTopic,
   targetTopicSubscription,
 } from "./control-plane-db/schema";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { createLogger } from "@wal/logger";
 
 const log = createLogger("control-plane:topic-service");
@@ -63,35 +63,28 @@ export const getConsumerTopicMap = async (
     topicList = [topicName];
   }
 
-  const topicDetails = await db
+  const rows = await db
     .select({
+      targetName: deliveryTarget.target_name,
+      communication_type: deliveryTarget.endpoint_communication_type,
+      endpoint: deliveryTarget.endpoint,
+      timeout: deliveryTarget.timeout,
       topic: targetTopicSubscription.kafka_topic_name,
-      deliveryTargetDetails: sql<
-        Array<{
-          targetName: string;
-          communication_type: string;
-          endpoint: string;
-          timeout: number;
-        }>
-      >`json_agg(
-        json_build_object(
-          'targetName', ${deliveryTarget.target_name},
-          'communication_type', ${deliveryTarget.endpoint_communication_type},
-          'endpoint', ${deliveryTarget.endpoint},
-          'timeout', ${deliveryTarget.timeout}
-        )
-      )`.as("deliveryTargetDetails"),
     })
     .from(targetTopicSubscription)
     .innerJoin(
       deliveryTarget,
       eq(targetTopicSubscription.delivery_target_id, deliveryTarget.id),
     )
-    .where(inArray(targetTopicSubscription.kafka_topic_name, topicList))
-    .groupBy(targetTopicSubscription.kafka_topic_name);
+    .where(inArray(targetTopicSubscription.kafka_topic_name, topicList));
 
-  for (const row of topicDetails) {
-    topicMap[row.topic] = row.deliveryTargetDetails;
+  for (const { targetName, topic, ...targetDetails } of rows) {
+    const existing = topicMap[targetName];
+    if (existing) {
+      existing.topics.push(topic);
+      continue;
+    }
+    topicMap[targetName] = { ...targetDetails, topics: [topic] };
   }
 
   return topicMap;

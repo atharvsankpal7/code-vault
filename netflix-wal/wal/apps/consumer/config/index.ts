@@ -19,7 +19,7 @@ const localConfig = validateConfig({
   sharedConsumerGroupId,
   serviceSpecificClientId: serviceSpecificGroupId + uuidv7(),
   sharedConsumerClientId: sharedConsumerGroupId + uuidv7(),
-  serviceSpecificClientTopicName: process.env.SPECIAL_TOPIC_NAME,
+  serviceSpecificClientName: consumerServices.SPECIFIC_CONSUMER_SERVICE,
 });
 
 const Config = {

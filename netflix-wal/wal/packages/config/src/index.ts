@@ -2,6 +2,7 @@ import path from "node:path";
 import dotenv from "dotenv";
 import { z } from "zod";
 import { createLogger } from "@wal/logger";
+import type { DeliveryTargetCommunicationType } from "./types";
 
 const log = createLogger("schema-validator");
 
@@ -49,13 +50,13 @@ export interface TopicDetails {
 export type TKafkaProducerTopicMapResponse = Record<string, TopicDetails>;
 
 export interface TDeliveryTarget {
-  targetName: string;
-  communication_type: string;
+  communication_type: DeliveryTargetCommunicationType;
   endpoint: string;
   timeout: number;
+  topics: string[];
 }
 
-export type TKafkaConsumerTopicMapResponse = Record<string, TDeliveryTarget[]>;
+export type TKafkaConsumerTopicMapResponse = Record<string, TDeliveryTarget>;
 
 export default GlobalConfig;
 

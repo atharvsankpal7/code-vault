@@ -2,8 +2,9 @@ import { Consumer, stringDeserializers } from "@platformatic/kafka";
 import Config from "./config";
 import { KAKFA_CONFIG } from "./kafka-config";
 import { createLogger } from "@wal/logger";
+import { sendMessageToTarget } from "./consumer.service";
 
-const log = createLogger(`consumer:${Config.serviceSpecificClientTopicName}`);
+const log = createLogger(`consumer:${Config.serviceSpecificClientName}`);
 
 export const consumer = new Consumer({
   clientId: Config.serviceSpecificClientId,
@@ -12,25 +13,32 @@ export const consumer = new Consumer({
   deserializers: stringDeserializers,
 });
 export async function startConsumer() {
-  if (!KAKFA_CONFIG[Config.serviceSpecificClientTopicName]) {
+  const topicDetails = KAKFA_CONFIG[Config.serviceSpecificClientName];
+  if (!topicDetails) {
     throw new Error(
-      `config for topic not found, topic_name: [${Config.serviceSpecificClientTopicName}]`,
+      `config for topic not found, topic_name: [${Config.serviceSpecificClientName}]`,
     );
   }
   const stream = await consumer.consume({
-    topics: [Config.serviceSpecificClientTopicName],
+    topics: topicDetails.topics,
     sessionTimeout: 10000,
     heartbeatInterval: 500,
   });
 
   stream.on("data", async (message) => {
+    log.info(
+      `[${message.topic}:${message.partition}@${message.offset}]`,
+      message.key,
+      message.value,
+    );
     try {
-      log.info(
-        `[${message.topic}:${message.partition}@${message.offset}]`,
-        message.key,
-        message.value,
+      // todo: check how can we batch the message sending
+      const response = await sendMessageToTarget(
+        message,
+        topicDetails.communication_type,
+        topicDetails.endpoint,
+        topicDetails.timeout,
       );
-      // send the message to the dedicated service using the given communicationn type
     } catch (err) {
       log.error("Processing failed", err);
       // if retry is exhauseted send to dlq else put it in the sqs for retry.

@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { getCreatedAtUpdatedAtForTableGeneration } from "@wal/wal-db/schema";
 import { TopicOperationType } from "@wal/config";
+import { DeliveryTargetCommunicationType } from "@wal/config/types";
 import { uniqueIndex } from "drizzle-orm/pg-core";
 
 const ReconciliationStatus = pgEnum("kafka_topic_reconciliation_status", [
@@ -40,15 +41,15 @@ export const kafkaTopic = pgTable(
   (kafkaTopic) => [uniqueIndex("email_idx").on(kafkaTopic.kafka_topic_name)],
 );
 
-const DeliveryTargetCommunicationType = pgEnum(
+const DeliveryTargetCommunicationTypePg = pgEnum(
   "target_endpoint_communication_type",
-  ["http", "pg", "s3"],
+  DeliveryTargetCommunicationType,
 );
 
 export const deliveryTarget = pgTable("delivery_target", {
   id: serial("id").primaryKey(), // will be used as consumer_group_id for kafka
   target_name: text("target_name").notNull(),
-  endpoint_communication_type: DeliveryTargetCommunicationType().notNull(),
+  endpoint_communication_type: DeliveryTargetCommunicationTypePg().notNull(),
   endpoint: text("endpoint").notNull(),
   timeout: integer("timeout")
     .notNull()

@@ -16,3 +16,9 @@ export type TCreateTopicDetails = zod.output<typeof createTopicSchema>;
 export const updateTopicSchema = createTopicSchema
   .omit({ topicName: true, replicationCount: true })
   .partial();
+
+export enum DeliveryTargetCommunicationType {
+  http = "http",
+  pg = "pg",
+  s3 = "s3",
+}
