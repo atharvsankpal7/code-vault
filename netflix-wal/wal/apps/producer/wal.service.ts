@@ -3,6 +3,7 @@ import { createLogger } from "@wal/logger";
 import Config from "./config";
 import { boss, WAL_OUTBOX_QUEUE } from "./pg-boss";
 import { KAKFA_CONFIG } from "./kafka-config";
+import { uuidv7 } from "uuidv7";
 
 const log = createLogger("producer:wal");
 
@@ -26,13 +27,15 @@ export const generateWal = async ({
     throw new Error(`Topic details not found for topic ${topicName}`);
   }
   const { operationType } = topicDetails;
-
   if (operationType === "kafka") {
     await kafkaProducer.send({
       messages: [
         {
           topic: topicName,
           value: message,
+          headers: {
+            idempotencyKey: uuidv7(),
+          },
         },
       ],
     });

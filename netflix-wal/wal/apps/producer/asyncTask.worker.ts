@@ -19,7 +19,9 @@ export const sendPendingMessageToKafka = async () => {
         messages.map(async (m) => {
           try {
             const message = m.data;
-            log.debug(`Processing outbox job ${m.id} for ${message.topic_name}`);
+            log.debug(
+              `Processing outbox job ${m.id} for ${message.topic_name}`,
+            );
 
             const ackValue = KAKFA_CONFIG[message.topic_name]?.acknowledgement;
 
@@ -39,14 +41,15 @@ export const sendPendingMessageToKafka = async () => {
                 {
                   topic: message.topic_name,
                   value: transformedMessage,
+                  headers: {
+                    idempotencyKey: m.id,
+                  },
                 },
               ],
               acks: ackValue,
             });
 
-            log.info(
-              `message ${m.id} sent to ${message.topic_name} in kafka`,
-            );
+            log.info(`message ${m.id} sent to ${message.topic_name} in kafka`);
 
             return {
               id: m.id,

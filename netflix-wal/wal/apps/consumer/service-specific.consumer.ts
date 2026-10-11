@@ -43,7 +43,7 @@ export async function startConsumer() {
       );
     } catch (err) {
       log.error("Processing failed", err);
-      // if retry is exhauseted send to dlq else put it in the sqs for retry.
+      // if retry is exhauseted send to dlq else put it in retry queue for retry.
     } finally {
       // commit for both success and failure as failure mode of our function puts message in another durable state
       await message.commit();
