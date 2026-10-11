@@ -1,25 +1,16 @@
 import { Admin } from "@platformatic/kafka";
 import GlobalConfig from "@wal/config";
 import { createLogger } from "@wal/logger";
+import { DLQ_TOPIC, RETRY_TOPIC_BY_STEP, TKafkaTopicSpec } from "../config";
 
 const log = createLogger("consumer:create-retry-topics");
 
 const REPLICATION_FACTOR = 3;
 const MIN_INSYNC_REPLICAS = 2;
-const FOURTEEN_DAYS_MS = String(14 * 24 * 60 * 60 * 1000);
-const RETAIN_FOREVER = "-1";
 
-type TRetryTopic = {
-  name: string;
-  partitions: number;
-  retentionMs: string;
-};
-
-const RETRY_TOPICS: TRetryTopic[] = [
-  { name: "retry-10s", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
-  { name: "retry-1m", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
-  { name: "retry-5m", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
-  { name: "dlq", partitions: 12, retentionMs: RETAIN_FOREVER },
+const RETRY_TOPICS: TKafkaTopicSpec[] = [
+  ...Object.values(RETRY_TOPIC_BY_STEP),
+  DLQ_TOPIC,
 ];
 
 const run = async () => {

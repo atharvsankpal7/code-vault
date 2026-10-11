@@ -27,4 +27,27 @@ const Config = {
   ...localConfig,
 } as const;
 
+export type TRetryStep = 1 | 2 | 3;
+
+export type TKafkaTopicSpec = {
+  name: string;
+  partitions: number;
+  retentionMs: string;
+};
+
+const FOURTEEN_DAYS_MS = String(14 * 24 * 60 * 60 * 1000);
+const RETAIN_FOREVER = "-1";
+
+export const RETRY_TOPIC_BY_STEP: Record<TRetryStep, TKafkaTopicSpec> = {
+  1: { name: "retry-10s", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
+  2: { name: "retry-1m", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
+  3: { name: "retry-5m", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
+};
+
+export const DLQ_TOPIC: TKafkaTopicSpec = {
+  name: "dlq",
+  partitions: 12,
+  retentionMs: RETAIN_FOREVER,
+};
+
 export default Config;

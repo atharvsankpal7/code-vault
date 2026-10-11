@@ -1,4 +1,4 @@
-import type { Message } from "@platformatic/kafka";
+import { Producer, stringSerializers, type Message } from "@platformatic/kafka";
 import type { TDeliveryTarget } from "@wal/config";
 import { DeliveryTargetCommunicationType } from "@wal/config/types";
 import {
@@ -9,6 +9,7 @@ import {
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import axios, { AxiosError } from "axios";
 import { DatabaseError, Pool } from "pg";
+import Config, { DLQ_TOPIC, RETRY_TOPIC_BY_STEP, TRetryStep } from "./config";
 
 // ---------- Error classification ----------
 
@@ -136,9 +137,8 @@ export const sendMessageToTarget = async (
   timeout: TDeliveryTarget["timeout"],
   targetName: string,
   topic: string,
+  idempotencyKey: string,
 ) => {
-  const idempotencyKey = message.headers.get("idempotencyKey");
-
   if (communicationType === DeliveryTargetCommunicationType.http) {
     let response;
     try {
@@ -211,50 +211,54 @@ export const sendMessageToTarget = async (
 };
 
 // ---------- Routing ----------
-
+export const producer = new Producer({
+  clientId: Config.serviceSpecificClientId,
+  bootstrapBrokers: Config.kafkaBrokers.split(","),
+  serializers: stringSerializers,
+});
 export const sendToDLQ = async (
   message: Message<string, string, string, string>,
-  topic: string,
   error: DeliveryError,
-): Promise<void> => {
-  throw new Error("sendToDLQ not implemented");
+) => {
+  return await producer.send({
+    messages: [
+      {
+        topic: DLQ_TOPIC.name,
+        value: message.value,
+        headers: {
+          ...message.headers,
+          originalTopic: message.topic,
+          originalOffset: String(message.offset),
+          originalMetadata: JSON.stringify(message.metadata),
+          error: JSON.stringify({
+            error,
+          }),
+        },
+      },
+    ],
+  });
 };
 
 export const sendToRetry = async (
+  retryStep: TRetryStep,
   message: Message<string, string, string, string>,
-  topic: string,
   error: DeliveryError,
 ): Promise<void> => {
-  throw new Error("sendToRetry not implemented");
-};
-
-export const deliverMessage = async (
-  message: Message<string, string, string, string>,
-  target: TDeliveryTarget & {
-    name: string;
-    communicationType: DeliveryTargetCommunicationType;
-  },
-  topic: string,
-) => {
-  try {
-    await sendMessageToTarget(
-      message,
-      target.communicationType,
-      target.endpoint,
-      target.timeout,
-      target.name,
-      topic,
-    );
-  } catch (err) {
-    const deliveryError =
-      err instanceof DeliveryError
-        ? err
-        : new DeliveryError(String(err), "transient", err);
-
-    if (deliveryError.kind === "permanent") {
-      await sendToDLQ(message, topic, deliveryError);
-    } else {
-      await sendToRetry(message, topic, deliveryError);
-    }
-  }
+  await producer.send({
+    messages: [
+      {
+        topic: RETRY_TOPIC_BY_STEP[retryStep].name,
+        value: message.value,
+        headers: {
+          ...message.headers,
+          originalTopic: message.topic,
+          originalOffset: String(message.offset),
+          originalMetadata: JSON.stringify(message.metadata),
+          error: JSON.stringify({
+            error,
+          }),
+        },
+      },
+    ],
+  });
 };
