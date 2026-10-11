@@ -58,6 +58,8 @@ export interface TDeliveryTarget {
 
 export type TKafkaConsumerTopicMapResponse = Record<string, TDeliveryTarget>;
 
+export type TServicePartitionMapResponse = Record<string, number>;
+
 export default GlobalConfig;
 
 export function validateType<T extends z.ZodType>(

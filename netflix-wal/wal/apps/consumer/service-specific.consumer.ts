@@ -1,6 +1,6 @@
 import { Consumer, stringDeserializers } from "@platformatic/kafka";
 import Config from "./config";
-import { KAKFA_CONFIG } from "./kafka-config";
+import { KAKFA_CONFIG } from "./infra-config";
 import { createLogger } from "@wal/logger";
 import { sendMessageToTarget } from "./consumer.service";
 
