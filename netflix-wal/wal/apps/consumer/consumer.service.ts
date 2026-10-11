@@ -45,32 +45,32 @@ export const sendMessageToTarget = async (
   targetName: string,
   topic: string,
 ) => {
+  const idempotencyKey = `${targetName}-${topic}-${message.partition}-${message.offset}`;
   if (communicationType === DeliveryTargetCommunicationType.http) {
     const response = await axios.post(
       `https://${endpoint}/${topic}`,
-      { message: message.value },
+      {
+        message: message.value,
+        idempotencyKey,
+      },
       {
         timeout: timeout,
       },
     );
 
     if (!(200 <= response.status && response.status < 300)) {
-      throw new Error(
-        `failed to deliver message to ${targetName} with offset :[${message.offset}] from topic: [${topic}]`,
-      );
+      throw new Error(`failed to deliver message ${idempotencyKey}`);
     }
 
     if (response.data?.error) {
-      throw new Error(
-        `failed to deliver message to ${targetName} with offset :[${message.offset}] from topic: [${topic}]`,
-      );
+      throw new Error(`failed to deliver message ${idempotencyKey}`);
     }
   }
   if (communicationType === DeliveryTargetCommunicationType.pg) {
     const pool = getPgPool(endpoint, timeout);
     await pool.query(
-      "INSERT INTO write_ahead_log (message, topic) VALUES ($1, $2)",
-      [message.value, topic],
+      "INSERT INTO write_ahead_log (message, topic, idempotencyKey) VALUES ($1, $2, $3)",
+      [message.value, topic, idempotencyKey],
     );
   }
   if (communicationType === DeliveryTargetCommunicationType.s3) {
