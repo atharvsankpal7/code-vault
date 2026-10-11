@@ -43,7 +43,9 @@ export const RETRY_TOPIC_BY_STEP: Record<TRetryStep, TKafkaTopicSpec> = {
   2: { name: "retry-1m", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
   3: { name: "retry-5m", partitions: 64, retentionMs: FOURTEEN_DAYS_MS },
 };
-
+export const RETRY_TOPIC_NAMES = Object.values(RETRY_TOPIC_BY_STEP).map(
+  (e) => e.name,
+);
 export const DLQ_TOPIC: TKafkaTopicSpec = {
   name: "dlq",
   partitions: 12,

@@ -10,6 +10,7 @@ import { NodeHttpHandler } from "@smithy/node-http-handler";
 import axios, { AxiosError } from "axios";
 import { DatabaseError, Pool } from "pg";
 import Config, { DLQ_TOPIC, RETRY_TOPIC_BY_STEP, TRetryStep } from "./config";
+import { SERVICE_PARTITION_MAP } from "./infra-config";
 
 // ---------- Error classification ----------
 
@@ -19,6 +20,7 @@ export class DeliveryError extends Error {
   constructor(
     message: string,
     public readonly kind: FailureKind,
+    public readonly target: string,
     public readonly cause?: unknown,
   ) {
     super(message);
@@ -131,7 +133,7 @@ const getPgPool = (endpoint: string, timeout: number): Pool => {
 // ---------- Delivery ----------
 
 export const sendMessageToTarget = async (
-  message: Message<string, string, string, string>,
+  message: Pick<Message<string, string, string, string>, "value">,
   communicationType: DeliveryTargetCommunicationType,
   endpoint: TDeliveryTarget["endpoint"],
   timeout: TDeliveryTarget["timeout"],
@@ -151,6 +153,7 @@ export const sendMessageToTarget = async (
       throw new DeliveryError(
         `HTTP delivery to ${targetName} failed for ${idempotencyKey}`,
         classifyHttpError(err),
+        targetName,
         err,
       );
     }
@@ -161,6 +164,7 @@ export const sendMessageToTarget = async (
           response.data.error,
         )}`,
         "permanent",
+        targetName,
       );
     }
     return;
@@ -178,6 +182,7 @@ export const sendMessageToTarget = async (
       throw new DeliveryError(
         `PG delivery to ${targetName} failed for ${idempotencyKey}`,
         classifyPgError(err),
+        targetName,
         err,
       );
     }
@@ -198,6 +203,7 @@ export const sendMessageToTarget = async (
       throw new DeliveryError(
         `S3 delivery to ${targetName} failed for ${idempotencyKey}`,
         classifyS3Error(err),
+        targetName,
         err,
       );
     }
@@ -207,6 +213,7 @@ export const sendMessageToTarget = async (
   throw new DeliveryError(
     `Unknown communication type: ${communicationType}`,
     "permanent",
+    targetName,
   );
 };
 
@@ -226,7 +233,8 @@ export const sendToDLQ = async (
         topic: DLQ_TOPIC.name,
         value: message.value,
         headers: {
-          ...message.headers,
+          ...Object.fromEntries(message.headers),
+          target: error.target,
           originalTopic: message.topic,
           originalOffset: String(message.offset),
           originalMetadata: JSON.stringify(message.metadata),
@@ -244,13 +252,21 @@ export const sendToRetry = async (
   message: Message<string, string, string, string>,
   error: DeliveryError,
 ): Promise<void> => {
+  const partition = SERVICE_PARTITION_MAP[error.target];
+  // no partition assigned to this target, so the retry can't be routed
+  if (partition === undefined) {
+    await sendToDLQ(message, error);
+    return;
+  }
+
   await producer.send({
     messages: [
       {
         topic: RETRY_TOPIC_BY_STEP[retryStep].name,
         value: message.value,
         headers: {
-          ...message.headers,
+          ...Object.fromEntries(message.headers),
+          target: error.target,
           originalTopic: message.topic,
           originalOffset: String(message.offset),
           originalMetadata: JSON.stringify(message.metadata),
@@ -258,6 +274,7 @@ export const sendToRetry = async (
             error,
           }),
         },
+        partition,
       },
     ],
   });

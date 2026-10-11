@@ -153,7 +153,7 @@ every N minutes:
         swap serviceMap atomically, log version
 ```
 
-## Decisions recap
+###### Decisions recap
 
 | Decision            | Choice                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------ |

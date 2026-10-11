@@ -54,7 +54,12 @@ export async function startConsumer() {
       const deliveryError =
         err instanceof DeliveryError
           ? err
-          : new DeliveryError(String(err), "transient", err);
+          : new DeliveryError(
+              String(err),
+              "transient",
+              Config.serviceSpecificClientName,
+              err,
+            );
       try {
         if (deliveryError.kind === "permanent") {
           await sendToDLQ(message, deliveryError);
@@ -64,7 +69,7 @@ export async function startConsumer() {
           message.commit();
         }
       } catch (err) {
-        // shit hit the fan something wrong
+        // sendOnCallAlert()
       }
     }
   });
