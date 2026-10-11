@@ -45,7 +45,7 @@ export const sendMessageToTarget = async (
   targetName: string,
   topic: string,
 ) => {
-  const idempotencyKey = `${targetName}-${topic}-${message.partition}-${message.offset}`;
+  const idempotencyKey = message.headers.get("idempotencyKey");
   if (communicationType === DeliveryTargetCommunicationType.http) {
     const response = await axios.post(
       `https://${endpoint}/${topic}`,
@@ -53,9 +53,7 @@ export const sendMessageToTarget = async (
         message: message.value,
         idempotencyKey,
       },
-      {
-        timeout: timeout,
-      },
+      { headers: { idempotencyKey }, timeout: timeout },
     );
 
     if (!(200 <= response.status && response.status < 300)) {
@@ -77,7 +75,7 @@ export const sendMessageToTarget = async (
     await getS3Client(timeout).send(
       new PutObjectCommand({
         Bucket: endpoint,
-        Key: `${topic}/${message.partition}-${message.offset}.json`,
+        Key: `${topic}/${idempotencyKey}.json`,
         Body: message.value,
         ContentType: "application/json",
       }),
