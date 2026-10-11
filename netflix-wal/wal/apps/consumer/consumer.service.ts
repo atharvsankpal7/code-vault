@@ -37,6 +37,43 @@ const getPgPool = (endpoint: string, timeout: number): Pool => {
   return pool;
 };
 
+export const getIdempotencyKey = (
+  message: Message<string, string, string, string>,
+  targetName: string,
+  topic: string,
+) =>
+  message.headers.get("idempotencyKey") ??
+  `${targetName}-${topic}-${message.partition}-${message.offset}`;
+
+// pg error classes that mean the message itself is bad: 22 = data exception,
+// 23 = integrity constraint violation, 42 = syntax error or access rule violation
+const nonRetryablePgErrorClasses = new Set(["22", "23", "42"]);
+
+// true when sending the same message again could succeed (5xx, timeouts,
+// connection errors, 408, 429), false when it never will (other 4xx, bad data)
+export const isRetryableError = (err: unknown): boolean => {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    if (status === undefined) {
+      return true;
+    }
+    return status >= 500 || status === 408 || status === 429;
+  }
+
+  const pgCode = (err as { code?: unknown })?.code;
+  if (typeof pgCode === "string" && pgCode.length === 5) {
+    return !nonRetryablePgErrorClasses.has(pgCode.slice(0, 2));
+  }
+
+  const s3Status = (err as { $metadata?: { httpStatusCode?: number } })
+    ?.$metadata?.httpStatusCode;
+  if (s3Status !== undefined) {
+    return s3Status >= 500 || s3Status === 408 || s3Status === 429;
+  }
+
+  return true;
+};
+
 export const sendMessageToTarget = async (
   message: Message<string, string, string, string>,
   communicationType: DeliveryTargetCommunicationType,
@@ -44,13 +81,30 @@ export const sendMessageToTarget = async (
   timeout: TDeliveryTarget["timeout"],
   targetName: string,
   topic: string,
+) =>
+  deliverToTarget(
+    message.value,
+    getIdempotencyKey(message, targetName, topic),
+    communicationType,
+    endpoint,
+    timeout,
+    topic,
+  );
+
+// client agnostic delivery, shared by the main consumer and the retry consumer
+export const deliverToTarget = async (
+  value: string,
+  idempotencyKey: string,
+  communicationType: DeliveryTargetCommunicationType,
+  endpoint: TDeliveryTarget["endpoint"],
+  timeout: TDeliveryTarget["timeout"],
+  topic: string,
 ) => {
-  const idempotencyKey = message.headers.get("idempotencyKey");
   if (communicationType === DeliveryTargetCommunicationType.http) {
     const response = await axios.post(
       `https://${endpoint}/${topic}`,
       {
-        message: message.value,
+        message: value,
         idempotencyKey,
       },
       { headers: { idempotencyKey }, timeout: timeout },
@@ -67,8 +121,8 @@ export const sendMessageToTarget = async (
   if (communicationType === DeliveryTargetCommunicationType.pg) {
     const pool = getPgPool(endpoint, timeout);
     await pool.query(
-      "INSERT INTO write_ahead_log (message, topic, idempotencyKey) VALUES ($1, $2, $3)",
-      [message.value, topic, idempotencyKey],
+      "INSERT INTO write_ahead_log (message, topic, idempotencyKey) VALUES ($1, $2, $3) ON CONFLICT (idempotencyKey) DO NOTHING",
+      [value, topic, idempotencyKey],
     );
   }
   if (communicationType === DeliveryTargetCommunicationType.s3) {
@@ -76,7 +130,7 @@ export const sendMessageToTarget = async (
       new PutObjectCommand({
         Bucket: endpoint,
         Key: `${topic}/${idempotencyKey}.json`,
-        Body: message.value,
+        Body: value,
         ContentType: "application/json",
       }),
     );

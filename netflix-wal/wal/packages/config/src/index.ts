@@ -58,6 +58,9 @@ export interface TDeliveryTarget {
 
 export type TKafkaConsumerTopicMapResponse = Record<string, TDeliveryTarget>;
 
+// delivery target name -> partition of the retry topics that holds its retries
+export type TServicePartitionMapResponse = Record<string, number>;
+
 export default GlobalConfig;
 
 export function validateType<T extends z.ZodType>(

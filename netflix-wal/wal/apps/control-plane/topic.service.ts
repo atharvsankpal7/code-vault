@@ -2,6 +2,7 @@ import { Admin } from "@platformatic/kafka";
 import {
   TKafkaConsumerTopicMapResponse,
   TKafkaProducerTopicMapResponse,
+  TServicePartitionMapResponse,
   TopicOperationType,
 } from "@wal/config";
 import db from "./control-plane-db";
@@ -10,7 +11,7 @@ import {
   kafkaTopic,
   targetTopicSubscription,
 } from "./control-plane-db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNotNull } from "drizzle-orm";
 import { createLogger } from "@wal/logger";
 
 const log = createLogger("control-plane:topic-service");
@@ -89,3 +90,23 @@ export const getConsumerTopicMap = async (
 
   return topicMap;
 };
+
+export const getServicePartitionMap =
+  async (): Promise<TServicePartitionMapResponse> => {
+    const servicePartitionMap: TServicePartitionMapResponse = {};
+
+    const rows = await db
+      .select({
+        targetName: deliveryTarget.target_name,
+        retryPartition: deliveryTarget.retry_partition,
+      })
+      .from(deliveryTarget)
+      .where(isNotNull(deliveryTarget.retry_partition));
+
+    for (const { targetName, retryPartition } of rows) {
+      servicePartitionMap[targetName] = retryPartition as number;
+    }
+
+    log.debug(`Built service partition map for ${rows.length} targets`);
+    return servicePartitionMap;
+  };

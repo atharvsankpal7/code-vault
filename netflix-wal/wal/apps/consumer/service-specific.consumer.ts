@@ -2,7 +2,16 @@ import { Consumer, stringDeserializers } from "@platformatic/kafka";
 import Config from "./config";
 import { KAKFA_CONFIG } from "./kafka-config";
 import { createLogger } from "@wal/logger";
-import { sendMessageToTarget } from "./consumer.service";
+import {
+  getIdempotencyKey,
+  isRetryableError,
+  sendMessageToTarget,
+} from "./consumer.service";
+import {
+  FailedDelivery,
+  produceRetry,
+  produceToDLQ,
+} from "./retry/retry-producer";
 
 const log = createLogger(`consumer:${Config.serviceSpecificClientName}`);
 
@@ -32,21 +41,45 @@ export async function startConsumer() {
       message.value,
     );
     try {
-      // todo: check how can we batch the message sending
-      await sendMessageToTarget(
-        message,
-        topicDetails.communication_type,
-        topicDetails.endpoint,
-        topicDetails.timeout,
-        Config.serviceSpecificClientName,
-        message.topic,
-      );
-    } catch (err) {
-      log.error("Processing failed", err);
-      // if retry is exhauseted send to dlq else put it in retry queue for retry.
-    } finally {
+      try {
+        // todo: check how can we batch the message sending
+        await sendMessageToTarget(
+          message,
+          topicDetails.communication_type,
+          topicDetails.endpoint,
+          topicDetails.timeout,
+          Config.serviceSpecificClientName,
+          message.topic,
+        );
+      } catch (err) {
+        log.error("Processing failed", err);
+        const failed: FailedDelivery = {
+          value: message.value,
+          targetName: Config.serviceSpecificClientName,
+          idempotencyKey: getIdempotencyKey(
+            message,
+            Config.serviceSpecificClientName,
+            message.topic,
+          ),
+          originalTopic: message.topic,
+          originalPartition: message.partition,
+          originalOffset: message.offset.toString(),
+          firstFailedAt: Date.now(),
+          retryAttempt: 0,
+          error: err,
+        };
+        if (isRetryableError(err)) {
+          await produceRetry(failed);
+        } else {
+          await produceToDLQ(failed, "non retryable error");
+        }
+      }
       // commit for both success and failure as failure mode of our function puts message in another durable state
       await message.commit();
+    } catch (err) {
+      // the failure could not be made durable, leave the offset uncommitted so
+      // the message is read again instead of being lost
+      log.error("Failed to hand off failed message, not committing", err);
     }
   });
 

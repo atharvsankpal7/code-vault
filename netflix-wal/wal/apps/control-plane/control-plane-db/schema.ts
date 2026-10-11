@@ -54,6 +54,7 @@ export const deliveryTarget = pgTable("delivery_target", {
   timeout: integer("timeout")
     .notNull()
     .default(15 * 1000),
+  retry_partition: integer("retry_partition").unique(),
   ...getCreatedAtUpdatedAtForTableGeneration(),
 });
 

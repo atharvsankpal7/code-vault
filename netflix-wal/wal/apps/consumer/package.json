@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch index.ts",
-    "start": "tsx index.ts"
+    "start": "tsx index.ts",
+    "dev:retry": "tsx watch retry.index.ts",
+    "start:retry": "tsx retry.index.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1149.0",

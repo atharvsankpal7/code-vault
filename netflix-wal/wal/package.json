@@ -13,7 +13,9 @@
     "wal-db:generate": "pnpm exec drizzle-kit generate --config packages/wal-db/drizzle.config.ts",
     "wal-db:migrate": "pnpm exec drizzle-kit migrate --config packages/wal-db/drizzle.config.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "dev:retry-consumer": "pnpm --filter wal-consumer dev:retry",
+    "start:retry-consumer": "pnpm --filter wal-consumer start:retry"
   },
   "dependencies": {
     "@wal/config": "workspace:*"

@@ -2,6 +2,7 @@ import express, { NextFunction, Request, Response } from "express";
 import { createLogger } from "@wal/logger";
 import Config from "./config";
 import { refreshConsumerTopicMap } from "./kafka-config";
+import { refreshServicePartitionMap } from "./retry/service-partition-map";
 
 const log = createLogger("consumer:api");
 
@@ -17,6 +18,14 @@ app.get("/refresh-consumer-kafka-map", async (_req: Request, res: Response) => {
   res.send("fetched updated kafka topic-service relation");
 });
 
+app.get(
+  "/refresh-service-partition-map",
+  async (_req: Request, res: Response) => {
+    await refreshServicePartitionMap();
+    res.send("fetched updated service-retry partition relation");
+  },
+);
+
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   log.error("Unhandled request error:", error);
 
@@ -24,6 +33,6 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(Config.PORT, async () => {
-  await refreshConsumerTopicMap();
+  await Promise.all([refreshConsumerTopicMap(), refreshServicePartitionMap()]);
   log.info(`Consumer is running on port ${Config.PORT}`);
 });

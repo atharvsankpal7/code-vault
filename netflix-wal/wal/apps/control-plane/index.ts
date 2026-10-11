@@ -4,7 +4,11 @@ import { sql } from "drizzle-orm";
 import Config from "./config";
 import db from "./control-plane-db";
 import { reconsiler } from "./reconsiler";
-import { getConsumerTopicMap, getTopicMap } from "./topic.service";
+import {
+  getConsumerTopicMap,
+  getServicePartitionMap,
+  getTopicMap,
+} from "./topic.service";
 import { Admin } from "@platformatic/kafka";
 import { validateType } from "@wal/config";
 import { createTopicSchema, updateTopicSchema } from "@wal/config/types";
@@ -72,6 +76,14 @@ app.get("/get-consumer-topic-map", async (_req: Request, res: Response) => {
     `Serving consumer topic map with ${Object.keys(topicMap).length} services`,
   );
   res.status(200).send({ topicMap: topicMap });
+});
+
+app.get("/get-service-partition-map", async (_req: Request, res: Response) => {
+  const servicePartitionMap = await getServicePartitionMap();
+  log.debug(
+    `Serving service partition map with ${Object.keys(servicePartitionMap).length} targets`,
+  );
+  res.status(200).send({ servicePartitionMap });
 });
 
 app.listen(Config.PORT, () => {
