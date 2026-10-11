@@ -5,9 +5,13 @@ import { IHeaders, Kafka } from "kafkajs";
 import { uuidv7 } from "uuidv7";
 import { validateConfig } from "@wal/config";
 import { createLogger } from "@wal/logger";
-import Config, { RETRY_TOPIC_NAMES } from "./config";
+import Config, { DLQ_TOPIC, RETRY_TOPIC_NAMES } from "./config";
 import { KAKFA_CONFIG } from "./infra-config";
-import { sendMessageToTarget } from "./consumer.service";
+import {
+  buildDLQMessage,
+  DeliveryError,
+  deliverToTarget,
+} from "./consumer.service";
 
 const log = createLogger("consumer:retry");
 
@@ -18,17 +22,29 @@ const kafka = new Kafka({
 
 const localConfig = validateConfig({
   groupId: process.env.RETRY_CONSUMER_GROUP_ID,
+  maxLinearFailure: process.env.MAX_LINEAR_FAILURE,
 });
-
+const linearFailureCountPerTargetMap: Map<string, number> = new Map();
+const MAX_LINEAR_FAILURE = parseInt(localConfig.maxLinearFailure);
 const consumer = kafka.consumer({
   groupId: localConfig.groupId,
 });
+
+const dlqProducer = kafka.producer();
 
 // kafkajs headers are Buffers, so read them as strings thanks haiku 5.5 for function :)
 const readHeader = (headers: IHeaders | undefined, key: string) =>
   headers?.[key]?.toString();
 
+const headersToStrings = (headers: IHeaders = {}): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(headers).flatMap(([key, value]) =>
+      value === undefined ? [] : [[key, value.toString()]],
+    ),
+  );
+
 const start = async () => {
+  await dlqProducer.connect();
   await consumer.connect();
   await consumer.subscribe({
     topics: RETRY_TOPIC_NAMES,
@@ -53,8 +69,8 @@ const start = async () => {
       }
 
       try {
-        await sendMessageToTarget(
-          { value: message.value?.toString() ?? "" },
+        await deliverToTarget(
+          message.value?.toString() ?? "",
           targetDetails.communication_type,
           targetDetails.endpoint,
           targetDetails.timeout,
@@ -63,8 +79,37 @@ const start = async () => {
           readHeader(message.headers, "idempotencyKey") ?? uuidv7(),
         );
       } catch (err) {
-        // TODO: forward to the next retry step or the DLQ instead of dropping
-        log.error(`retry to ${target} failed`, err);
+        if (err instanceof DeliveryError) {
+          if (err.kind === "permanent") {
+            await dlqProducer.send({
+              topic: DLQ_TOPIC.name,
+              messages: [
+                buildDLQMessage({
+                  value: message.value?.toString() ?? "",
+                  headers: headersToStrings(message.headers),
+                  originalTopic,
+                  originalOffset: message.offset,
+                  error: err,
+                }),
+              ],
+            });
+            log.error(`retry to ${target} failed, sent to dlq, err: `, err);
+            return;
+          }
+          if (err.kind === "transient") {
+            const currentTargetLinearFailureCount =
+              linearFailureCountPerTargetMap.get(target) ??
+              linearFailureCountPerTargetMap.set(target, 1).get(target)!;
+
+            if (currentTargetLinearFailureCount >= MAX_LINEAR_FAILURE) {
+              // pause and retry after SERVICE_OUTAGE_RETRY_TIME from the config.
+              // seek back to the starting point of the message offset
+            } else {
+              // send to the next step of the retry
+              // commit the message
+            }
+          }
+        }
       }
     },
   });

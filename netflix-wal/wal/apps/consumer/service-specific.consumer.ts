@@ -61,10 +61,7 @@ export async function startConsumer() {
               err,
             );
       try {
-        if (deliveryError.kind === "permanent") {
-          await sendToDLQ(message, deliveryError);
-          message.commit();
-        } else {
+        if (deliveryError.kind === "transient") {
           await sendToRetry(1, message, deliveryError);
           message.commit();
         }

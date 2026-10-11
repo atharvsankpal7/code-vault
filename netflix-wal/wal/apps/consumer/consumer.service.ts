@@ -132,21 +132,23 @@ const getPgPool = (endpoint: string, timeout: number): Pool => {
 
 // ---------- Delivery ----------
 
-export const sendMessageToTarget = async (
-  message: Pick<Message<string, string, string, string>, "value">,
+// Delivers a raw value and throws a DeliveryError on failure. Shared by the
+// platformatic consumer (via sendMessageToTarget) and the kafkajs retry consumer.
+export const deliverToTarget = async (
+  value: string,
   communicationType: DeliveryTargetCommunicationType,
   endpoint: TDeliveryTarget["endpoint"],
   timeout: TDeliveryTarget["timeout"],
   targetName: string,
   topic: string,
   idempotencyKey: string,
-) => {
+): Promise<void> => {
   if (communicationType === DeliveryTargetCommunicationType.http) {
     let response;
     try {
       response = await axios.post(
         `https://${endpoint}/${topic}`,
-        { message: message.value, idempotencyKey },
+        { message: value, idempotencyKey },
         { headers: { idempotencyKey }, timeout },
       );
     } catch (err) {
@@ -174,7 +176,7 @@ export const sendMessageToTarget = async (
     try {
       await getPgPool(endpoint, timeout).query(
         "INSERT INTO write_ahead_log (message, topic, idempotencyKey) VALUES ($1, $2, $3)",
-        [message.value, topic, idempotencyKey],
+        [value, topic, idempotencyKey],
       );
     } catch (err) {
       // Duplicate idempotency key means an earlier attempt already succeeded
@@ -195,7 +197,7 @@ export const sendMessageToTarget = async (
         new PutObjectCommand({
           Bucket: endpoint,
           Key: `${topic}/${idempotencyKey}.json`,
-          Body: message.value,
+          Body: value,
           ContentType: "application/json",
         }),
       );
@@ -217,12 +219,70 @@ export const sendMessageToTarget = async (
   );
 };
 
+export const sendMessageToTarget = async (
+  message: Message<string, string, string, string>,
+  communicationType: DeliveryTargetCommunicationType,
+  endpoint: TDeliveryTarget["endpoint"],
+  timeout: TDeliveryTarget["timeout"],
+  targetName: string,
+  topic: string,
+  idempotencyKey: string,
+) => {
+  try {
+    await deliverToTarget(
+      message.value,
+      communicationType,
+      endpoint,
+      timeout,
+      targetName,
+      topic,
+      idempotencyKey,
+    );
+  } catch (err) {
+    if (err instanceof DeliveryError) {
+      if (err.kind === "permanent") {
+        await sendToDLQ(message, err);
+        message.commit();
+      }
+    } else {
+      throw err;
+    }
+  }
+};
+
 // ---------- Routing ----------
 export const producer = new Producer({
   clientId: Config.serviceSpecificClientId,
   bootstrapBrokers: Config.kafkaBrokers.split(","),
   serializers: stringSerializers,
 });
+// Shared by every consumer that writes to the DLQ, so the header format stays the same.
+// The caller serializes its own metadata (if any) and passes it in.
+export type TDLQSource = {
+  value: string;
+  headers: Record<string, string>;
+  originalTopic: string;
+  originalOffset: string;
+  originalMetadata?: string;
+  error: DeliveryError;
+};
+
+export const buildDLQMessage = (source: TDLQSource) => ({
+  value: source.value,
+  headers: {
+    ...source.headers,
+    target: source.error.target,
+    originalTopic: source.originalTopic,
+    originalOffset: source.originalOffset,
+    ...(source.originalMetadata !== undefined && {
+      originalMetadata: source.originalMetadata,
+    }),
+    error: JSON.stringify({
+      error: source.error,
+    }),
+  },
+});
+
 export const sendToDLQ = async (
   message: Message<string, string, string, string>,
   error: DeliveryError,
@@ -231,17 +291,14 @@ export const sendToDLQ = async (
     messages: [
       {
         topic: DLQ_TOPIC.name,
-        value: message.value,
-        headers: {
-          ...Object.fromEntries(message.headers),
-          target: error.target,
+        ...buildDLQMessage({
+          value: message.value,
+          headers: Object.fromEntries(message.headers),
           originalTopic: message.topic,
           originalOffset: String(message.offset),
           originalMetadata: JSON.stringify(message.metadata),
-          error: JSON.stringify({
-            error,
-          }),
-        },
+          error,
+        }),
       },
     ],
   });
