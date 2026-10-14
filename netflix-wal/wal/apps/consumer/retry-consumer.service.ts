@@ -5,8 +5,14 @@ import { IHeaders, Kafka } from "kafkajs";
 import { uuidv7 } from "uuidv7";
 import { validateConfig } from "@wal/config";
 import { createLogger } from "@wal/logger";
-import Config, { DLQ_TOPIC, RETRY_TOPIC_NAMES } from "./config";
-import { KAKFA_CONFIG } from "./infra-config";
+import Config, {
+  DLQ_TOPIC,
+  getRetryStepByTopic,
+  RETRY_TOPIC_BY_STEP,
+  RETRY_TOPIC_NAMES,
+  TRetryStep,
+} from "./config";
+import { KAKFA_CONFIG, SERVICE_PARTITION_MAP } from "./infra-config";
 import {
   buildDLQMessage,
   DeliveryError,
@@ -30,7 +36,7 @@ const consumer = kafka.consumer({
   groupId: localConfig.groupId,
 });
 
-const dlqProducer = kafka.producer();
+const producer = kafka.producer();
 
 // kafkajs headers are Buffers, so read them as strings thanks haiku 5.5 for function :)
 const readHeader = (headers: IHeaders | undefined, key: string) =>
@@ -44,7 +50,7 @@ const headersToStrings = (headers: IHeaders = {}): Record<string, string> =>
   );
 
 const start = async () => {
-  await dlqProducer.connect();
+  await producer.connect();
   await consumer.connect();
   await consumer.subscribe({
     topics: RETRY_TOPIC_NAMES,
@@ -81,7 +87,7 @@ const start = async () => {
       } catch (err) {
         if (err instanceof DeliveryError) {
           if (err.kind === "permanent") {
-            await dlqProducer.send({
+            await producer.send({
               topic: DLQ_TOPIC.name,
               messages: [
                 buildDLQMessage({
@@ -105,8 +111,44 @@ const start = async () => {
               // pause and retry after SERVICE_OUTAGE_RETRY_TIME from the config.
               // seek back to the starting point of the message offset
             } else {
-              // send to the next step of the retry
-              // commit the message
+              const currentStep = getRetryStepByTopic(topic);
+              const nextStep = (currentStep + 1) as TRetryStep;
+              const nextRetryTopic = RETRY_TOPIC_BY_STEP[nextStep];
+              const partition = SERVICE_PARTITION_MAP[target];
+
+              // no next retry tier, or no partition to route to, so give up and send to the DLQ
+              if (!nextRetryTopic || partition === undefined) {
+                await producer.send({
+                  topic: DLQ_TOPIC.name,
+                  messages: [
+                    buildDLQMessage({
+                      value: message.value?.toString() ?? "",
+                      headers: headersToStrings(message.headers),
+                      originalTopic,
+                      originalOffset: message.offset,
+                      error: err,
+                    }),
+                  ],
+                });
+                return;
+              }
+
+              await producer.send({
+                topic: nextRetryTopic.name,
+                messages: [
+                  {
+                    value: message.value?.toString() ?? "",
+                    headers: {
+                      ...headersToStrings(message.headers),
+                      target,
+                      originalTopic,
+                      originalOffset: message.offset,
+                      error: JSON.stringify({ error: err }),
+                    },
+                    partition,
+                  },
+                ],
+              });
             }
           }
         }

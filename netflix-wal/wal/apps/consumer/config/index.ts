@@ -46,6 +46,16 @@ export const RETRY_TOPIC_BY_STEP: Record<TRetryStep, TKafkaTopicSpec> = {
 export const RETRY_TOPIC_NAMES = Object.values(RETRY_TOPIC_BY_STEP).map(
   (e) => e.name,
 );
+export const getRetryStepByTopic = (topic: string): number => {
+  const entry = Object.entries(RETRY_TOPIC_BY_STEP).find(
+    ([, spec]) => spec.name === topic,
+  );
+  if (!entry) {
+    throw new Error(`no retry step found for topic ${topic}`);
+  }
+  return Number(entry[0]);
+};
+
 export const DLQ_TOPIC: TKafkaTopicSpec = {
   name: "dlq",
   partitions: 12,
