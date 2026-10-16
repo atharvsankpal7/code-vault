@@ -20,6 +20,8 @@ const localConfig = validateConfig({
   serviceSpecificClientId: serviceSpecificGroupId + uuidv7(),
   sharedConsumerClientId: sharedConsumerGroupId + uuidv7(),
   serviceSpecificClientName: consumerServices.SPECIFIC_CONSUMER_SERVICE,
+  serviceOutageRetryTime:
+    process.env.SERVICE_OUTAGE_RETRY_TIME ?? String(5 * 1000 * 60),
 });
 
 const Config = {

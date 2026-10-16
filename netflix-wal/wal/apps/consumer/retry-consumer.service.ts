@@ -48,7 +48,32 @@ const headersToStrings = (headers: IHeaders = {}): Record<string, string> =>
       value === undefined ? [] : [[key, value.toString()]],
     ),
   );
+// target is treated as down, so stop the partition and rewind to the failed message.
+// after the wait we resume, kafkajs redelivers this same message first (it acts as the probe).
+// if the probe succeeds the counter is reset in eachMessage and the normal flow continues,
+// if it fails again the counter is still over the limit so we land back here and wait again.
+const outageHandler = ({
+  topic,
+  partition,
+  offset,
+  target,
+}: {
+  topic: string;
+  partition: number;
+  offset: string;
+  target: string;
+}) => {
+  consumer.pause([{ topic, partitions: [partition] }]);
+  consumer.seek({ topic, partition, offset });
+  log.warn(
+    `target ${target} looks down, pausing ${topic}[${partition}] at offset ${offset}`,
+  );
 
+  setTimeout(() => {
+    log.info(`resuming ${topic}[${partition}] to probe target ${target}`);
+    consumer.resume([{ topic, partitions: [partition] }]);
+  }, Number(Config.serviceOutageRetryTime));
+};
 const start = async () => {
   await producer.connect();
   await consumer.connect();
@@ -57,7 +82,7 @@ const start = async () => {
     fromBeginning: false,
   });
   await consumer.run({
-    eachMessage: async ({ topic, message, pause }) => {
+    eachMessage: async ({ topic, partition, message, pause }) => {
       const target = readHeader(message.headers, "target");
       const originalTopic = readHeader(message.headers, "originalTopic");
       if (!target || !originalTopic) {
@@ -84,6 +109,8 @@ const start = async () => {
           originalTopic,
           readHeader(message.headers, "idempotencyKey") ?? uuidv7(),
         );
+        // target answered, so it is not in an outage anymore
+        linearFailureCountPerTargetMap.delete(target);
       } catch (err) {
         if (err instanceof DeliveryError) {
           if (err.kind === "permanent") {
@@ -104,12 +131,20 @@ const start = async () => {
           }
           if (err.kind === "transient") {
             const currentTargetLinearFailureCount =
-              linearFailureCountPerTargetMap.get(target) ??
-              linearFailureCountPerTargetMap.set(target, 1).get(target)!;
+              (linearFailureCountPerTargetMap.get(target) ?? 0) + 1;
+            linearFailureCountPerTargetMap.set(
+              target,
+              currentTargetLinearFailureCount,
+            );
 
             if (currentTargetLinearFailureCount >= MAX_LINEAR_FAILURE) {
-              // pause and retry after SERVICE_OUTAGE_RETRY_TIME from the config.
-              // seek back to the starting point of the message offset
+              outageHandler({
+                topic,
+                partition,
+                offset: message.offset,
+                target,
+              });
+              return;
             } else {
               const currentStep = getRetryStepByTopic(topic);
               const nextStep = (currentStep + 1) as TRetryStep;
